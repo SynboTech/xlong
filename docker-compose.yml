@@ -14,6 +14,15 @@ services:
       - ADMIN_HOST=0.0.0.0
       - ADMIN_PORT=8765
       - ADMIN_TOKEN=admin-test
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin-test
+      - ADMIN_ROLE=admin
+      - ADMIN_OPERATOR_USERNAME=operator
+      - ADMIN_OPERATOR_PASSWORD=operator-test
+      - ADMIN_OPERATOR_ROLE=operator
+      - ADMIN_VIEWER_USERNAME=viewer
+      - ADMIN_VIEWER_PASSWORD=viewer-test
+      - ADMIN_VIEWER_ROLE=viewer
     ports:
       - "8765:8765"
     volumes:

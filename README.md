@@ -73,10 +73,10 @@ docker compose up --build market-maker-paper
 Admin 控制台：
 
 ```bash
-ADMIN_TOKEN='change-me' PYTHONPATH=src python3 scripts/admin_server.py
+ADMIN_USERNAME='admin' ADMIN_PASSWORD='change-me' PYTHONPATH=src python3 scripts/admin_server.py
 ```
 
-如果未设置 `ADMIN_TOKEN`，本地开发 token 会生成到 `runtime/admin_token.json`。生产环境必须显式设置 `ADMIN_TOKEN`，可选设置 `ADMIN_OPERATOR_TOKEN` 和 `ADMIN_VIEWER_TOKEN` 做 RBAC 分权。所有敏感操作需要输入确认短语，并写入带 HMAC 链式签名的 `runtime/admin_audit.jsonl`。
+Docker 开发环境默认账号为 `admin / admin-test`，并附带 `operator / operator-test`、`viewer / viewer-test` 用于 RBAC 验证。生产环境必须显式设置 `ADMIN_USERNAME` / `ADMIN_PASSWORD`，或使用 `ADMIN_USERS_JSON` 配置多用户；旧版 `ADMIN_TOKEN`、`ADMIN_OPERATOR_TOKEN`、`ADMIN_VIEWER_TOKEN` 仍兼容。所有敏感操作需要输入确认短语，并按登录用户写入带 HMAC 链式签名的 `runtime/admin_audit.jsonl`。
 
 ## 目录
 

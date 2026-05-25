@@ -36,6 +36,7 @@ RISK_STATE_PATH = os.path.join(ROOT, "runtime/risk_state.json")
 RUNTIME_COMMANDS_PATH = os.path.join(ROOT, "runtime/commands.json")
 ADMIN_AUDIT_PATH = os.path.join(ROOT, "runtime/admin_audit.jsonl")
 ADMIN_TOKEN_PATH = os.path.join(ROOT, "runtime/admin_token.json")
+ADMIN_USERS_PATH = os.path.join(ROOT, "runtime/admin_users.json")
 
 
 ROLE_PERMISSIONS = {
@@ -55,6 +56,7 @@ POST_PERMISSIONS = {
     "/api/strategies/stop-cancel": "operate",
     "/api/orders/cancel-plan": "operate",
     "/api/risk/kill-switch": "operate",
+    "/api/auth/logout": "read",
 }
 
 
@@ -142,6 +144,9 @@ class AdminHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/exchanges":
             return self._json_audited(principal, path, body, save_exchange_account(body))
+
+        if path == "/api/auth/logout":
+            return self._json_audited(principal, path, body, admin_security().logout(self.headers))
 
         if path == "/api/exchanges/test":
             return self._json_audited(principal, path, body, test_exchange_account(body))
@@ -240,10 +245,23 @@ class AdminHandler(SimpleHTTPRequestHandler):
 
 
 class AdminSecurity:
-    def __init__(self, tokens=None, audit_path=None, token_path=None, audit_secret=None):
+    def __init__(
+        self,
+        tokens=None,
+        users=None,
+        audit_path=None,
+        token_path=None,
+        users_path=None,
+        audit_secret=None,
+        session_ttl_sec=None,
+    ):
         self.audit_path = audit_path or ADMIN_AUDIT_PATH
         self.token_path = token_path or ADMIN_TOKEN_PATH
-        self.tokens = tokens or self._load_tokens()
+        self.users_path = users_path or ADMIN_USERS_PATH
+        self.tokens = tokens if tokens is not None else self._load_tokens()
+        self.users = users if users is not None else self._load_users()
+        self.sessions = {}
+        self.session_ttl_ms = int(session_ttl_sec or os.environ.get("ADMIN_SESSION_TTL_SEC", "28800")) * 1000
         self.audit_secret = audit_secret or os.environ.get("ADMIN_AUDIT_SECRET") or self._first_token()
 
     def _load_tokens(self):
@@ -279,6 +297,93 @@ class AdminSecurity:
         )
         return token
 
+    def _load_users(self):
+        users = {}
+        self._add_env_user(users, "ADMIN", "admin")
+        self._add_env_user(users, "ADMIN_OPERATOR", "operator")
+        self._add_env_user(users, "ADMIN_VIEWER", "viewer")
+        users_json = os.environ.get("ADMIN_USERS_JSON", "")
+        if users_json:
+            for item in self._parse_users_json(users_json):
+                users[str(item["username"])] = item
+        if users:
+            return users
+        data = read_json_file(self.users_path, {})
+        rows = data.get("users", []) if isinstance(data, dict) else []
+        for item in rows:
+            if isinstance(item, dict) and item.get("username") and item.get("password_hash"):
+                users[str(item["username"])] = {
+                    "username": str(item["username"]),
+                    "password_hash": str(item["password_hash"]),
+                    "role": str(item.get("role", "viewer")),
+                    "active": bool(item.get("active", True)),
+                }
+        if users:
+            return users
+        return self._create_local_admin_user()
+
+    def _add_env_user(self, users, prefix, default_role):
+        username = os.environ.get("{0}_USERNAME".format(prefix), "")
+        password = os.environ.get("{0}_PASSWORD".format(prefix), "")
+        role = os.environ.get("{0}_ROLE".format(prefix), default_role)
+        if username and password:
+            users[username] = {
+                "username": username,
+                "password_hash": hash_password(password),
+                "role": role,
+                "active": True,
+            }
+
+    def _parse_users_json(self, users_json):
+        parsed = json.loads(users_json)
+        rows = []
+        if isinstance(parsed, dict):
+            for username, item in parsed.items():
+                if isinstance(item, dict):
+                    row = dict(item)
+                    row.setdefault("username", username)
+                    rows.append(row)
+        else:
+            rows = parsed
+        result = []
+        for item in rows:
+            if not isinstance(item, dict) or not item.get("username"):
+                continue
+            password_hash = item.get("password_hash")
+            password = item.get("password")
+            if not password_hash and password:
+                password_hash = hash_password(str(password))
+            if not password_hash:
+                continue
+            result.append(
+                {
+                    "username": str(item["username"]),
+                    "password_hash": str(password_hash),
+                    "role": str(item.get("role", "viewer")),
+                    "active": bool(item.get("active", True)),
+                }
+            )
+        return result
+
+    def _create_local_admin_user(self):
+        password = secrets.token_urlsafe(18)
+        user = {
+            "username": "local-admin",
+            "password_hash": hash_password(password),
+            "role": "admin",
+            "active": True,
+        }
+        write_json_file(
+            self.users_path,
+            {
+                "users": [user],
+                "created_at_ms": now_ms(),
+                "initial_password": password,
+                "message": "Local development admin user. Set ADMIN_USERNAME/ADMIN_PASSWORD in production.",
+            },
+        )
+        return {user["username"]: user}
+
     def _first_token(self):
         return next(iter(self.tokens.keys()), "admin-audit-dev-secret")
 
@@ -287,14 +392,27 @@ class AdminSecurity:
 
     def authenticate(self, headers):
         token = self._token_from_headers(headers)
-        principal = self.tokens.get(token)
+        principal = self._session_principal(token)
+        auth_type = "session"
+        if principal is None:
+            principal = self.tokens.get(token)
+            auth_type = "token"
         if principal is None:
             return None
         role = principal.get("role", "viewer")
         permissions = sorted(ROLE_PERMISSIONS.get(role, {"read"}))
-        return {"user": principal.get("user", role), "role": role, "permissions": permissions}
+        return {
+            "user": principal.get("user") or principal.get("username") or role,
+            "role": role,
+            "permissions": permissions,
+            "auth_type": auth_type,
+        }
 
     def login(self, body):
+        username = str(body.get("username") or "").strip()
+        password = str(body.get("password") or "")
+        if username or password:
+            return self._login_password(username, password)
         token = str(body.get("token") or "")
         principal = self.tokens.get(token)
         if principal is None:
@@ -302,13 +420,62 @@ class AdminSecurity:
             self.append_audit(self.anonymous(), "/api/auth/login", {}, payload, 401)
             return payload
         role = principal.get("role", "viewer")
-        user = {"user": principal.get("user", role), "role": role, "permissions": sorted(ROLE_PERMISSIONS.get(role, {"read"}))}
-        payload = {"ok": True, "user": user}
+        user = {
+            "user": principal.get("user", role),
+            "role": role,
+            "permissions": sorted(ROLE_PERMISSIONS.get(role, {"read"})),
+            "auth_type": "token",
+        }
+        payload = {"ok": True, "user": user, "token": token}
         self.append_audit(user, "/api/auth/login", {}, payload, 200)
         return payload
 
+    def _login_password(self, username, password):
+        principal = self.users.get(username)
+        request_payload = {"username": username, "password": password}
+        if principal is None or not principal.get("active", True) or not verify_password(password, principal.get("password_hash", "")):
+            payload = {"ok": False, "error": "invalid username or password"}
+            self.append_audit(self.anonymous(), "/api/auth/login", request_payload, payload, 401)
+            return payload
+        token = "sess_{0}".format(secrets.token_urlsafe(32))
+        expires_at_ms = now_ms() + self.session_ttl_ms
+        session = {
+            "user": principal.get("username", username),
+            "role": principal.get("role", "viewer"),
+            "expires_at_ms": expires_at_ms,
+            "login_at_ms": now_ms(),
+        }
+        self.sessions[token] = session
+        user = {
+            "user": session["user"],
+            "role": session["role"],
+            "permissions": sorted(ROLE_PERMISSIONS.get(session["role"], {"read"})),
+            "auth_type": "session",
+            "expires_at_ms": expires_at_ms,
+        }
+        payload = {"ok": True, "user": user, "token": token}
+        self.append_audit(user, "/api/auth/login", request_payload, payload, 200)
+        return payload
+
+    def logout(self, headers):
+        token = self._token_from_headers(headers)
+        removed = token in self.sessions
+        self.sessions.pop(token, None)
+        return {"ok": True, "logged_out": removed}
+
     def allowed(self, principal, permission):
         return permission in set(principal.get("permissions", []))
+
+    def _session_principal(self, token):
+        if not token:
+            return None
+        session = self.sessions.get(token)
+        if session is None:
+            return None
+        if int(session.get("expires_at_ms", 0)) < now_ms():
+            self.sessions.pop(token, None)
+            return None
+        return session
 
     @staticmethod
     def _token_from_headers(headers):
@@ -324,6 +491,7 @@ class AdminSecurity:
             "ts": now_ms(),
             "user": principal.get("user", "unknown"),
             "role": principal.get("role", "unknown"),
+            "auth_type": principal.get("auth_type", "unknown"),
             "path": path,
             "status": int(status),
             "success": bool(success),
@@ -413,8 +581,42 @@ def permission_for(method, path):
     return "admin"
 
 
+def hash_password(password, iterations=200000):
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", str(password).encode("utf-8"), salt, int(iterations))
+    return "pbkdf2_sha256${0}${1}${2}".format(iterations, salt.hex(), digest.hex())
+
+
+def verify_password(password, password_hash):
+    try:
+        scheme, iterations, salt_hex, digest_hex = str(password_hash).split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        expected = bytes.fromhex(digest_hex)
+        actual = hashlib.pbkdf2_hmac(
+            "sha256",
+            str(password).encode("utf-8"),
+            bytes.fromhex(salt_hex),
+            int(iterations),
+        )
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+
 def redact_payload(value):
-    sensitive = {"api_key", "api_secret", "memo", "token", "authorization", "x-admin-token"}
+    sensitive = {
+        "api_key",
+        "api_secret",
+        "memo",
+        "token",
+        "authorization",
+        "x-admin-token",
+        "password",
+        "password_hash",
+        "initial_password",
+        "session",
+    }
     if isinstance(value, dict):
         result = {}
         for key, item in value.items():
@@ -1476,6 +1678,8 @@ def main():
     print("Admin server running at http://{0}:{1}/".format(display_host, port), flush=True)
     if os.path.exists(ADMIN_TOKEN_PATH) and not os.environ.get("ADMIN_TOKEN"):
         print("Local admin token file: {0}".format(ADMIN_TOKEN_PATH), flush=True)
+    if os.path.exists(ADMIN_USERS_PATH) and not os.environ.get("ADMIN_USERNAME"):
+        print("Local admin users file: {0}".format(ADMIN_USERS_PATH), flush=True)
     print("Admin audit log: {0}".format(security.audit_path), flush=True)
     server.serve_forever()
 

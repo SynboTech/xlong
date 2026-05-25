@@ -108,6 +108,57 @@ class AdminSecurityTest(unittest.TestCase):
         audit = self.admin.admin_security().audit_payload()
         self.assertEqual(audit["events"][-1]["request"], {})
 
+    def test_password_login_creates_user_session_and_audits_user(self):
+        security = self.admin.AdminSecurity(
+            tokens={},
+            users={
+                "trader-a": {
+                    "username": "trader-a",
+                    "password_hash": self.admin.hash_password("secret-pass"),
+                    "role": "operator",
+                    "active": True,
+                }
+            },
+            audit_path=self.admin.ADMIN_AUDIT_PATH,
+            token_path=self.admin.ADMIN_TOKEN_PATH,
+            users_path=os.path.join(self.tmp.name, "admin_users.json"),
+            audit_secret="test-audit-secret",
+        )
+        payload = security.login({"username": "trader-a", "password": "secret-pass"})
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["token"].startswith("sess_"))
+        principal = security.authenticate({"Authorization": "Bearer {0}".format(payload["token"])})
+        self.assertEqual(principal["user"], "trader-a")
+        self.assertEqual(principal["role"], "operator")
+        self.assertEqual(principal["auth_type"], "session")
+        audit = security.audit_payload()
+        self.assertTrue(audit["valid_chain"])
+        self.assertEqual(audit["events"][-1]["user"], "trader-a")
+        self.assertEqual(audit["events"][-1]["request"]["username"], "trader-a")
+        self.assertEqual(audit["events"][-1]["request"]["password"], "***")
+
+    def test_password_login_rejects_invalid_user_without_leaking_password(self):
+        security = self.admin.AdminSecurity(
+            tokens={},
+            users={
+                "viewer-a": {
+                    "username": "viewer-a",
+                    "password_hash": self.admin.hash_password("right-pass"),
+                    "role": "viewer",
+                    "active": True,
+                }
+            },
+            audit_path=self.admin.ADMIN_AUDIT_PATH,
+            token_path=self.admin.ADMIN_TOKEN_PATH,
+            users_path=os.path.join(self.tmp.name, "admin_users.json"),
+            audit_secret="test-audit-secret",
+        )
+        payload = security.login({"username": "viewer-a", "password": "wrong-pass"})
+        self.assertFalse(payload["ok"])
+        audit = security.audit_payload()
+        self.assertEqual(audit["events"][-1]["user"], "anonymous")
+        self.assertEqual(audit["events"][-1]["request"]["password"], "***")
+
     def _write(self, path, payload):
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh)

@@ -543,11 +543,19 @@
         </div>
         <div class="panel-body">
           <div class="field">
-            <label for="adminTokenInput">Admin Token</label>
-            <input id="adminTokenInput" type="password" autocomplete="current-password" />
+            <label for="adminUsernameInput">用户名</label>
+            <input id="adminUsernameInput" type="text" autocomplete="username" placeholder="admin" />
+          </div>
+          <div class="field">
+            <label for="adminPasswordInput">密码</label>
+            <input id="adminPasswordInput" type="password" autocomplete="current-password" />
+          </div>
+          <div class="field">
+            <label for="adminTokenInput">兼容 Admin Token</label>
+            <input id="adminTokenInput" type="password" autocomplete="off" placeholder="仅旧 token 登录时填写" />
           </div>
           <button class="btn primary" id="adminLoginBtn" type="button">登录控制台</button>
-          <div id="loginStatus" class="inline-status">本地开发 token 位于 runtime/admin_token.json；生产环境使用 ADMIN_TOKEN。</div>
+          <div id="loginStatus" class="inline-status">Docker 开发账号 admin / admin-test；生产环境使用 ADMIN_USERNAME / ADMIN_PASSWORD 或 ADMIN_USERS_JSON。</div>
         </div>
       </div>
     </div>
@@ -910,7 +918,7 @@ PYTHONPATH=src python3 scripts/rate_limit_report.py</pre>
       };
 
       const auth = {
-        token: localStorage.getItem("xlongAdminToken") || "",
+        token: localStorage.getItem("xlongAdminSession") || localStorage.getItem("xlongAdminToken") || "",
         user: null,
       };
 
@@ -1112,30 +1120,44 @@ PYTHONPATH=src python3 scripts/rate_limit_report.py</pre>
       }
 
       async function loginAdmin() {
+        const username = $("adminUsernameInput").value.trim();
+        const password = $("adminPasswordInput").value;
         const token = $("adminTokenInput").value.trim();
+        const payload = username || password ? { username, password } : { token };
         const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!data.ok) {
           $("loginStatus").textContent = data.error || "登录失败";
           return;
         }
-        auth.token = token;
+        auth.token = data.token || token;
         auth.user = data.user;
-        localStorage.setItem("xlongAdminToken", token);
+        localStorage.setItem("xlongAdminSession", auth.token);
+        localStorage.removeItem("xlongAdminToken");
+        $("adminUsernameInput").value = "";
+        $("adminPasswordInput").value = "";
         $("adminTokenInput").value = "";
         hideLogin();
         await bootstrap();
       }
 
-      function logoutAdmin() {
+      async function logoutAdmin() {
+        if (auth.token) {
+          await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({}),
+          }).catch(() => null);
+        }
         auth.token = "";
         auth.user = null;
+        localStorage.removeItem("xlongAdminSession");
         localStorage.removeItem("xlongAdminToken");
-        showLogin("已退出，请重新输入 Admin Token");
+        showLogin("已退出，请重新登录");
       }
 
       async function requireAuth() {
@@ -1898,10 +1920,16 @@ PYTHONPATH=src python3 scripts/rate_limit_report.py</pre>
       $("killSwitchBtn").addEventListener("click", () => toggleKillSwitch(true).catch((err) => setToast(err.message)));
       $("riskKillBtn").addEventListener("click", () => toggleKillSwitch(true).catch((err) => setToast(err.message)));
       $("adminLoginBtn").addEventListener("click", () => loginAdmin().catch((err) => $("loginStatus").textContent = err.message));
+      $("adminUsernameInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") loginAdmin().catch((err) => $("loginStatus").textContent = err.message);
+      });
+      $("adminPasswordInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") loginAdmin().catch((err) => $("loginStatus").textContent = err.message);
+      });
       $("adminTokenInput").addEventListener("keydown", (event) => {
         if (event.key === "Enter") loginAdmin().catch((err) => $("loginStatus").textContent = err.message);
       });
-      $("logoutBtn").addEventListener("click", logoutAdmin);
+      $("logoutBtn").addEventListener("click", () => logoutAdmin().catch((err) => setToast(err.message)));
       document.querySelectorAll(".order-tab").forEach((btn) => btn.addEventListener("click", () => refreshOrders(btn.dataset.source).catch((err) => $("orderActionStatus").textContent = err.message)));
       document.querySelectorAll(".order-status-filter").forEach((btn) => btn.addEventListener("click", () => setOrderStatusFilter(btn.dataset.filter)));
       $("orderStrategyFilter").addEventListener("change", () => setOrderStrategyFilter($("orderStrategyFilter").value));
