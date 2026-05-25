@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from decimal import Decimal
 
-from mm.common.types import OrderRequest, OrderStatus, OrderType, Side
+from mm.common.types import OrderAck, OrderRequest, OrderStatus, OrderType, Side
 from mm.config.settings import AppSettings
 from mm.exchange.paper import PaperExchange
 from mm.oms.manager import OrderManager, OrderStateError
@@ -59,6 +59,23 @@ class OmsTest(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_unknown_submit_ack_stays_unknown(self):
+        async def scenario():
+            oms = OrderManager()
+            request = OrderRequest(
+                symbol="BTC_USDT",
+                side=Side.BUY,
+                order_type=OrderType.LIMIT_MAKER,
+                price=Decimal("67000"),
+                size=Decimal("0.00005"),
+                client_order_id="test-buy-unknown",
+                strategy="test",
+            )
+            await oms.submit(UnknownAckGateway(), request)
+            self.assertEqual(oms.get("test-buy-unknown").status, OrderStatus.UNKNOWN)
+
+        asyncio.run(scenario())
+
 
 def record_cancel(record):
     from mm.common.types import CancelRequest
@@ -71,6 +88,16 @@ def record_cancel(record):
     )
 
 
+class UnknownAckGateway:
+    async def submit_order(self, request):
+        return OrderAck(
+            False,
+            request.client_order_id,
+            None,
+            OrderStatus.UNKNOWN,
+            "network timeout after submit",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
-

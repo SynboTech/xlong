@@ -124,6 +124,21 @@ class LiveControlsTest(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_bitmart_batch_missing_row_is_unknown(self):
+        async def scenario():
+            gateway = PartialBatchBitMartGateway()
+            acks = await gateway.submit_batch_orders(
+                [
+                    OrderRequest("BTC_USDT", Side.BUY, OrderType.LIMIT_MAKER, Decimal("0.1"), Decimal("100"), "btc-1", "s"),
+                    OrderRequest("BTC_USDT", Side.SELL, OrderType.LIMIT_MAKER, Decimal("0.1"), Decimal("101"), "btc-2", "s"),
+                ]
+            )
+            self.assertTrue(acks[0].accepted)
+            self.assertFalse(acks[1].accepted)
+            self.assertEqual(acks[1].status, OrderStatus.UNKNOWN)
+
+        asyncio.run(scenario())
+
     def test_bitmart_rest_request_runs_off_event_loop(self):
         async def scenario():
             gateway = SlowBitMartGateway()
@@ -192,6 +207,8 @@ class LiveControlsTest(unittest.TestCase):
                     processor,
                 )
                 self.assertEqual(app.oms.get("cid-private").status, OrderStatus.FILLED)
+                self.assertEqual(app._fills, 1)
+                self.assertEqual(app.pnl.for_symbol("BTC_USDT").position, Decimal("0.1"))
                 self.assertEqual(app.inventory.balance("USDT").available, Decimal("9"))
                 self.assertEqual(app.inventory.balance("USDT").frozen, Decimal("1"))
 
@@ -259,6 +276,16 @@ class CapturingBitMartGateway(BitMartRestGateway):
             return {"orderIds": ["remote-{0}".format(item["clientOrderId"]) for item in body["orderParams"]]}
         if path == "/spot/v4/cancel_orders":
             return {"result": True}
+        return {}
+
+
+class PartialBatchBitMartGateway(BitMartRestGateway):
+    def __init__(self):
+        super().__init__(BitMartCredentials("key", "secret", "memo"))
+
+    def _request(self, method, path, params=None, body=None, keyed=False, signed=False):
+        if path == "/spot/v4/batch_orders":
+            return {"orderIds": ["remote-{0}".format(body["orderParams"][0]["clientOrderId"])]}
         return {}
 
 

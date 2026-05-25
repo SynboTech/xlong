@@ -19,7 +19,7 @@ SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-from mm.common.types import CancelRequest, to_jsonable
+from mm.common.types import to_jsonable
 from mm.config.audit import build_config_audit
 from mm.config.settings import AppSettings
 from mm.exchange.bitmart.rest import BitMartRestGateway
@@ -33,6 +33,7 @@ EVENTS_PATH = os.path.join(ROOT, "runtime/events.jsonl")
 EXCHANGES_PATH = os.path.join(ROOT, "runtime/exchanges.json")
 STRATEGY_STATE_PATH = os.path.join(ROOT, "runtime/strategy_state.json")
 RISK_STATE_PATH = os.path.join(ROOT, "runtime/risk_state.json")
+RUNTIME_COMMANDS_PATH = os.path.join(ROOT, "runtime/commands.json")
 ADMIN_AUDIT_PATH = os.path.join(ROOT, "runtime/admin_audit.jsonl")
 ADMIN_TOKEN_PATH = os.path.join(ROOT, "runtime/admin_token.json")
 
@@ -128,6 +129,11 @@ class AdminHandler(SimpleHTTPRequestHandler):
         principal = self._authorize("POST", path, body)
         if principal is None:
             return
+        permission_error = execution_permission_error_for(principal, path, body)
+        if permission_error:
+            payload = {"ok": False, "error": permission_error, "required_permission": "trade"}
+            admin_security().append_audit(principal, path, body, payload, 403)
+            return self._json(payload, status=403)
         confirmation_error = confirmation_error_for(path, body)
         if confirmation_error:
             payload = {"ok": False, "error": confirmation_error}
@@ -445,6 +451,8 @@ def expected_confirmation(path, body):
         key = str(body.get("key") or body.get("id") or "").strip()
         if not key and body.get("name") and body.get("symbol"):
             key = "{0}:{1}".format(body.get("name"), str(body.get("symbol")).upper())
+        if bool(body.get("execute", False)):
+            return "EXECUTE LIVE CANCEL {0}".format(key) if key else "EXECUTE LIVE CANCEL"
         return "STOP CANCEL {0}".format(key) if key else "STOP CANCEL"
     if path == "/api/strategies/state":
         action = str(body.get("action") or "").lower()
@@ -455,6 +463,13 @@ def expected_confirmation(path, body):
             return "START STRATEGY {0}".format(key) if key else "START STRATEGY"
     if path == "/api/risk/kill-switch":
         return "PAUSE NEW ORDERS" if bool(body.get("enabled", True)) else "RESUME NEW ORDERS"
+    return ""
+
+
+def execution_permission_error_for(principal, path, body):
+    if path == "/api/strategies/stop-cancel" and bool(body.get("execute", False)):
+        if not admin_security().allowed(principal, "trade"):
+            return "permission denied: trade permission required for live execution"
     return ""
 
 
@@ -555,6 +570,14 @@ def configured_order_store_path():
     except Exception:
         return ORDERS_PATH
     return resolve_runtime_path(config.get("order_store_path") or ORDERS_PATH)
+
+
+def configured_runtime_command_path():
+    try:
+        config = read_config()
+    except Exception:
+        return RUNTIME_COMMANDS_PATH
+    return resolve_runtime_path(config.get("runtime_command_path") or RUNTIME_COMMANDS_PATH)
 
 
 def order_store_kind(path):
@@ -1359,35 +1382,41 @@ def stop_cancel_strategy(body):
     except Exception as exc:
         result["message"] = str(exc)
         return result
-    requests = [
-        CancelRequest(
-            symbol=item.get("symbol"),
-            client_order_id=item.get("client_order_id"),
-            exchange_order_id=item.get("exchange_order_id"),
-            reason="admin stop-cancel {0}".format(key),
-        )
-        for item in plan.get("requests", [])
-    ]
+    requests = list(plan.get("requests", []))
     if not requests:
         result["executed"] = True
         result["message"] = "strategy paused; no open orders to cancel"
         return result
-    acks = asyncio.run(cancel_requests_live(settings, requests))
-    result["executed"] = True
-    result["acks"] = to_jsonable(acks)
-    result["message"] = "strategy paused; live cancel requests submitted"
+    command = queue_runtime_command(
+        {
+            "type": "stop_cancel_strategy",
+            "strategy": key,
+            "strategy_aliases": sorted(strategy_order_keys(target)),
+            "requests": requests,
+            "source": "admin",
+            "mode": settings.trading_mode.value,
+        }
+    )
+    result["queued"] = True
+    result["command_id"] = command["id"]
+    result["message"] = "strategy paused; live cancel command queued for trading engine"
     return result
 
 
-async def cancel_requests_live(settings, requests):
-    gateway = BitMartRestGateway(settings.bitmart)
-    acks = []
-    by_symbol = {}
-    for request in requests:
-        by_symbol.setdefault(request.symbol, []).append(request)
-    for batch in by_symbol.values():
-        acks.extend(await gateway.cancel_batch_orders(batch))
-    return acks
+def queue_runtime_command(command):
+    path = configured_runtime_command_path()
+    payload = read_json_file(path, {"commands": []})
+    commands = payload.setdefault("commands", [])
+    if not isinstance(commands, list):
+        commands = []
+        payload["commands"] = commands
+    command = dict(command)
+    command["id"] = "cmd-{0}-{1}".format(now_ms(), secrets.token_hex(4))
+    command["status"] = "pending"
+    command["created_at_ms"] = now_ms()
+    commands.append(command)
+    write_json_file(path, payload)
+    return command
 
 
 def update_kill_switch(body):

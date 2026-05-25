@@ -19,6 +19,10 @@ class WebSocketDependencyError(RuntimeError):
     pass
 
 
+class WebSocketAuthError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class WebSocketConfig:
     url: str
@@ -26,6 +30,7 @@ class WebSocketConfig:
     credentials: Optional[BitMartCredentials] = None
     ping_interval_sec: int = 15
     reconnect_delay_sec: int = 3
+    login_timeout_sec: float = 5.0
 
 
 class BitMartWebSocketClient:
@@ -41,7 +46,7 @@ class BitMartWebSocketClient:
                 async with websockets.connect(self.config.url, ping_interval=self.config.ping_interval_sec) as ws:
                     self.connected = True
                     if self.config.credentials is not None:
-                        await ws.send(json.dumps(login(self.config.credentials).as_dict()))
+                        await self._login_private(ws)
                     await ws.send(json.dumps(subscribe(self.config.channels).as_dict()))
                     async for message in ws:
                         if isinstance(message, bytes):
@@ -62,6 +67,44 @@ class BitMartWebSocketClient:
             ) from exc
         return websockets
 
+    async def _login_private(self, ws) -> Dict[str, Any]:
+        if self.config.credentials is None:
+            return {}
+        await ws.send(json.dumps(login(self.config.credentials).as_dict()))
+        while True:
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=self.config.login_timeout_sec)
+            except asyncio.TimeoutError as exc:
+                raise WebSocketAuthError("BitMart private WebSocket login ack timed out") from exc
+            message = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+            payload = json.loads(message)
+            if self._is_login_ack(payload):
+                if self._is_failed_ack(payload):
+                    raise WebSocketAuthError("BitMart private WebSocket login failed: {0}".format(payload))
+                return payload
+            if self._is_error_ack(payload):
+                raise WebSocketAuthError("BitMart private WebSocket error before login ack: {0}".format(payload))
+
+    @staticmethod
+    def _is_login_ack(payload: Dict[str, Any]) -> bool:
+        op = str(payload.get("op") or payload.get("event") or payload.get("action") or "").lower()
+        return op == "login" or str(payload.get("type") or "").lower() == "login"
+
+    @staticmethod
+    def _is_error_ack(payload: Dict[str, Any]) -> bool:
+        event = str(payload.get("event") or payload.get("op") or "").lower()
+        code = payload.get("code")
+        return event == "error" or (code is not None and str(code) not in {"0", "1000"})
+
+    @staticmethod
+    def _is_failed_ack(payload: Dict[str, Any]) -> bool:
+        if payload.get("success") is False:
+            return True
+        if payload.get("errorCode") or payload.get("error_code"):
+            return True
+        code = payload.get("code")
+        return code is not None and str(code) not in {"0", "1000"}
+
 
 def public_client(channels: Iterable[str]) -> BitMartWebSocketClient:
     return BitMartWebSocketClient(WebSocketConfig(url=PUBLIC_WS_URL, channels=channels))
@@ -71,4 +114,3 @@ def private_client(channels: Iterable[str], credentials: BitMartCredentials) -> 
     return BitMartWebSocketClient(
         WebSocketConfig(url=PRIVATE_WS_URL, channels=channels, credentials=credentials)
     )
-

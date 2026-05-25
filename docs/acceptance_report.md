@@ -1,6 +1,6 @@
 # Market Maker Acceptance Report
 
-Generated: 2026-05-25T18:10:59.356446+00:00
+Generated: 2026-05-25T18:49:55.909606+00:00
 
 ## Result
 
@@ -11,9 +11,9 @@ Status: **PASS**
 Exit code: `0`
 
 ```text
-..................................................................................
+..........................................................................................
 ----------------------------------------------------------------------
-Ran 82 tests in 3.114s
+Ran 90 tests in 2.843s
 
 OK
 ```
@@ -56,7 +56,7 @@ OK
 {
   "fills": 6,
   "open_orders": 0,
-  "orders_total": 20,
+  "orders_total": 24,
   "rejected_intents": 0,
   "safe_mode": false,
   "ticks": 10
@@ -89,9 +89,9 @@ OK
       "total": "0.009850"
     },
     "USDT": {
-      "available": "1003.42279800",
+      "available": "1003.42415600",
       "frozen": "6.76281750",
-      "total": "1010.18561550"
+      "total": "1010.18697350"
     }
   },
   "health_ok": true,
@@ -119,15 +119,15 @@ OK
   },
   "metrics": {
     "balance_available{'currency': 'BTC'}": "0.009750",
-    "balance_available{'currency': 'USDT'}": "1003.42279800",
+    "balance_available{'currency': 'USDT'}": "1003.42415600",
     "balance_frozen{'currency': 'BTC'}": "0.000100",
     "balance_frozen{'currency': 'USDT'}": "6.76281750",
-    "cancel_request_count": "14",
+    "cancel_request_count": "20",
     "daily_pnl": "0E-33",
     "fill_count{'side': 'sell', 'symbol': 'BTC_USDT'}": "6",
     "market_data_lag_ms{'exchange': 'paper', 'symbol': 'BTC_USDT'}": "0",
     "market_data_lag_ms{'exchange': 'paper', 'symbol': 'SYNBO_USDT'}": "0",
-    "place_request_count": "20"
+    "place_request_count": "24"
   },
   "open_orders": 0,
   "pnl": {
@@ -144,7 +144,7 @@ OK
     "BTC_USDT",
     "SYNBO_USDT"
   ],
-  "total_orders": 1720,
+  "total_orders": 1820,
   "trading_mode": "paper"
 }
 ```
@@ -255,8 +255,8 @@ OK
     "login_payload": {
       "args": [
         "dryrun_key",
-        "1779732659216",
-        "1f1f61230be59d113317dd2145d267d6f45b343e8dc75e2c5fbdf89c462cd1da"
+        "1779734995768",
+        "7ff2c8340ae9d05201fd12e0264a6aef79617b568d15c1b0c7a2fc18ef6c7d92"
       ],
       "op": "login"
     },
@@ -279,9 +279,9 @@ OK
 ```json
 {
   "event_log_path": "runtime/events.jsonl",
-  "generated_order_intents": 4960,
-  "generated_quotes": 4960,
-  "market_snapshots": 1240,
+  "generated_order_intents": 5280,
+  "generated_quotes": 5280,
+  "market_snapshots": 1320,
   "symbols": [
     "BTC_USDT",
     "SYNBO_USDT"
@@ -294,7 +294,7 @@ OK
 ```json
 {
   "event_log_path": "runtime/events.jsonl",
-  "fills": 404,
+  "fills": 416,
   "symbols": {
     "BTC_USDT": {
       "avg_cost": "0",

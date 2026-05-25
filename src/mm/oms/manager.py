@@ -171,7 +171,8 @@ class OrderManager:
                 target = OrderStatus.OPEN
             self._transition(record, target, ack.message)
         else:
-            self._transition(record, OrderStatus.REJECTED, ack.message)
+            target = OrderStatus.UNKNOWN if ack.status == OrderStatus.UNKNOWN else OrderStatus.REJECTED
+            self._transition(record, target, ack.message)
         self._log("order.submit.ack", ack)
         return record
 

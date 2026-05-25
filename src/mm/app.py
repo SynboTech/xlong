@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+import tempfile
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
 
 from mm.accounting.pnl import PnlTracker
-from mm.common.types import CancelRequest, MarketSnapshot, OrderIntent, OrderRequest, TradingMode
+from mm.common.time import utc_ms
+from mm.common.types import CancelRequest, MarketSnapshot, OrderIntent, OrderRequest, TradingMode, to_jsonable
 from mm.config.settings import AppSettings
 from mm.exchange.base import ExchangeGateway
 from mm.exchange.bitmart.private_stream import BitMartPrivateStreamProcessor
@@ -67,6 +71,7 @@ class MarketMakerApp:
         self._stop_requested = False
         self._private_stream_client_factory = private_stream_client_factory or private_client
         self._private_stream_task: Optional[asyncio.Task] = None
+        self._internal_safe_mode_reasons: Dict[str, str] = {}
 
     async def run(self, ticks: Optional[int] = 10) -> RunSummary:
         await self.gateway.connect()
@@ -79,7 +84,10 @@ class MarketMakerApp:
                 report = await self.reconciliation.reconcile_open_orders(symbol)
                 self.event_log.append("oms.reconcile.startup", report)
                 if report.unknown_count > 0:
-                    self.risk.enter_safe_mode("startup reconciliation has UNKNOWN orders")
+                    self._enter_internal_safe_mode(
+                        "startup_reconciliation",
+                        "startup reconciliation has UNKNOWN orders",
+                    )
             while not self._stop_requested and (ticks is None or ticks_done < ticks):
                 await self.tick_once()
                 ticks_done += 1
@@ -118,6 +126,7 @@ class MarketMakerApp:
 
     async def tick_once(self) -> None:
         self._apply_runtime_controls()
+        await self._apply_runtime_commands()
         for symbol in self.settings.symbols:
             market = await self.gateway.next_market_snapshot(symbol)
             self.markets[symbol] = market
@@ -201,8 +210,112 @@ class MarketMakerApp:
         self.strategy.set_paused_strategies(controls.paused_strategy_keys)
         if controls.safe_mode:
             self.risk.enter_safe_mode(controls.safe_mode_reason or "admin safe mode")
+        elif self._internal_safe_mode_reasons:
+            self.risk.enter_safe_mode(self._internal_safe_mode_reason())
         else:
             self.risk.exit_safe_mode()
+
+    def _enter_internal_safe_mode(self, key: str, reason: str) -> None:
+        self._internal_safe_mode_reasons[key] = reason
+        self.risk.enter_safe_mode(self._internal_safe_mode_reason())
+
+    def _internal_safe_mode_reason(self) -> str:
+        return "; ".join(self._internal_safe_mode_reasons[key] for key in sorted(self._internal_safe_mode_reasons))
+
+    async def _apply_runtime_commands(self) -> None:
+        payload = self._read_runtime_commands()
+        commands = payload.get("commands", [])
+        if not isinstance(commands, list):
+            return
+        for command in commands:
+            if not isinstance(command, dict) or command.get("status") != "pending":
+                continue
+            command["status"] = "processing"
+            command["started_at_ms"] = utc_ms()
+            self._write_runtime_commands(payload)
+            try:
+                result = await self._execute_runtime_command(command)
+                command["status"] = "done"
+                command["result"] = to_jsonable(result)
+            except Exception as exc:
+                command["status"] = "failed"
+                command["error"] = str(exc)
+                self._enter_internal_safe_mode(
+                    "runtime_command_{0}".format(command.get("id", "unknown")),
+                    "runtime command failed: {0}".format(exc),
+                )
+            command["finished_at_ms"] = utc_ms()
+            self._write_runtime_commands(payload)
+
+    async def _execute_runtime_command(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        command_type = str(command.get("type") or "")
+        if command_type != "stop_cancel_strategy":
+            raise ValueError("unknown runtime command type {0}".format(command_type))
+        requests = self._cancel_requests_from_command(command)
+        records = []
+        for batch in self._group_by_symbol(requests).values():
+            records.extend(await self.oms.cancel_batch(self.gateway, batch))
+        self.event_log.append("runtime.command.executed", {"command": command, "records": records})
+        return {"request_count": len(requests), "records": records}
+
+    def _cancel_requests_from_command(self, command: Dict[str, Any]) -> List[CancelRequest]:
+        requests_by_client_id: Dict[str, CancelRequest] = {}
+        for item in command.get("requests", []):
+            if not isinstance(item, dict):
+                continue
+            client_order_id = str(item.get("client_order_id") or "")
+            symbol = str(item.get("symbol") or "")
+            if not client_order_id or not symbol:
+                continue
+            requests_by_client_id[client_order_id] = CancelRequest(
+                symbol=symbol,
+                client_order_id=client_order_id,
+                exchange_order_id=item.get("exchange_order_id"),
+                reason="runtime command {0}".format(command.get("id", "")),
+            )
+        strategy_key = str(command.get("strategy") or command.get("key") or "")
+        strategy_aliases = set(str(item) for item in command.get("strategy_aliases", []) if item)
+        if strategy_key:
+            strategy_aliases.add(strategy_key)
+        for order in self.oms.open_orders():
+            if strategy_aliases and order.strategy not in strategy_aliases:
+                continue
+            requests_by_client_id.setdefault(
+                order.client_order_id,
+                CancelRequest(
+                    symbol=order.symbol,
+                    client_order_id=order.client_order_id,
+                    exchange_order_id=order.exchange_order_id,
+                    reason="runtime command {0}".format(command.get("id", "")),
+                ),
+            )
+        return list(requests_by_client_id.values())
+
+    def _read_runtime_commands(self) -> Dict[str, Any]:
+        path = self.settings.runtime_command_path
+        if not path or not os.path.exists(path):
+            return {"commands": []}
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return {"commands": []}
+        return payload if isinstance(payload, dict) else {"commands": []}
+
+    def _write_runtime_commands(self, payload: Dict[str, Any]) -> None:
+        path = self.settings.runtime_command_path
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(prefix=".{0}-".format(os.path.basename(path)), suffix=".tmp", dir=parent or None)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                fh.write("\n")
+            os.replace(tmp_path, path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
     @staticmethod
     def _group_by_symbol(requests):
@@ -276,12 +389,18 @@ class MarketMakerApp:
             except WebSocketDependencyError as exc:
                 self.event_log.append("bitmart.private.error", {"error": str(exc), "fatal": True})
                 if self.settings.trading_mode == TradingMode.LIVE:
-                    self.risk.enter_safe_mode("BitMart private WebSocket dependency missing")
+                    self._enter_internal_safe_mode(
+                        "bitmart_private_ws_dependency",
+                        "BitMart private WebSocket dependency missing",
+                    )
                 return
             except Exception as exc:
                 self.event_log.append("bitmart.private.error", {"error": str(exc), "fatal": False})
                 if self.settings.trading_mode == TradingMode.LIVE:
-                    self.risk.enter_safe_mode("BitMart private WebSocket disconnected")
+                    self._enter_internal_safe_mode(
+                        "bitmart_private_ws_disconnected",
+                        "BitMart private WebSocket disconnected",
+                    )
                 await asyncio.sleep(reconnect_delay_sec)
 
     async def _consume_private_stream(self, client: object, processor: BitMartPrivateStreamProcessor) -> None:
@@ -291,8 +410,20 @@ class MarketMakerApp:
             self.metrics.inc("bitmart_private_stream_messages")
             self.metrics.inc("bitmart_private_order_updates", report.order_updates)
             self.metrics.inc("bitmart_private_balance_updates", report.balance_updates)
+            for fill in report.fills:
+                self.pnl.apply_fill(fill)
+                hedge_intent = self.hedging.intent_from_fill(fill)
+                if hedge_intent is not None:
+                    hedge_result = await self.hedging.execute(hedge_intent)
+                    self.event_log.append("hedge.result", hedge_result)
+                self.event_log.append("order.fill.private", fill)
+                self._fills += 1
+                self.metrics.inc("fill_count", symbol=fill.symbol, side=fill.side.value)
             if report.unknown_orders > 0:
-                self.risk.enter_safe_mode("BitMart private stream produced UNKNOWN order state")
+                self._enter_internal_safe_mode(
+                    "bitmart_private_unknown_order",
+                    "BitMart private stream produced UNKNOWN order state",
+                )
             if self._stop_requested:
                 break
 

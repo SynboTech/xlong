@@ -24,11 +24,13 @@ class AdminSecurityTest(unittest.TestCase):
         self.admin.EXCHANGES_PATH = os.path.join(root, "exchanges.json")
         self.admin.STRATEGY_STATE_PATH = os.path.join(root, "strategy_state.json")
         self.admin.RISK_STATE_PATH = os.path.join(root, "risk_state.json")
+        self.admin.RUNTIME_COMMANDS_PATH = os.path.join(root, "commands.json")
         self.admin.ADMIN_AUDIT_PATH = os.path.join(root, "admin_audit.jsonl")
         self.admin.ADMIN_TOKEN_PATH = os.path.join(root, "admin_token.json")
         self.admin.SECURITY = self.admin.AdminSecurity(
             tokens={
                 "admin-token": {"user": "alice", "role": "admin"},
+                "operator-token": {"user": "olivia", "role": "operator"},
                 "viewer-token": {"user": "bob", "role": "viewer"},
             },
             audit_path=self.admin.ADMIN_AUDIT_PATH,
@@ -82,6 +84,23 @@ class AdminSecurityTest(unittest.TestCase):
         self.assertTrue(audit["valid_chain"])
         self.assertGreaterEqual(audit["total"], 1)
         self.assertEqual(audit["events"][-1]["request"]["confirmation"], "PAUSE NEW ORDERS")
+
+    def test_live_stop_cancel_execute_requires_trade_permission_and_stronger_confirmation(self):
+        expected = self.admin.expected_confirmation(
+            "/api/strategies/stop-cancel",
+            {"key": "basic_mm:BTC_USDT", "execute": True},
+        )
+        self.assertEqual(expected, "EXECUTE LIVE CANCEL basic_mm:BTC_USDT")
+        operator = self.admin.admin_security().authenticate({"Authorization": "Bearer operator-token"})
+        self.assertEqual(operator["role"], "operator")
+        self.assertEqual(
+            self.admin.execution_permission_error_for(
+                operator,
+                "/api/strategies/stop-cancel",
+                {"key": "basic_mm:BTC_USDT", "execute": True},
+            ),
+            "permission denied: trade permission required for live execution",
+        )
 
     def test_login_redacts_token_in_audit(self):
         payload = self.admin.admin_security().login({"token": "admin-token"})

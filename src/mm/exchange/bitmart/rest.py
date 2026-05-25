@@ -181,23 +181,21 @@ class BitMartRestGateway(ExchangeGateway):
             ]
         nested = data.get("data", data)
         rows = nested.get("orderIds") or nested.get("orders") or data.get("orderIds") or data.get("orders") or []
+        if isinstance(rows, dict):
+            rows = list(rows.values())
+        if not isinstance(rows, list):
+            rows = []
+        rows_by_client_order_id = {
+            str(row.get("clientOrderId") or row.get("client_order_id")): row
+            for row in rows
+            if isinstance(row, dict) and (row.get("clientOrderId") or row.get("client_order_id"))
+        }
         acks: List[OrderAck] = []
         for idx, request in enumerate(requests):
-            row = rows[idx] if idx < len(rows) else {}
-            if isinstance(row, str):
-                exchange_order_id = row
-            else:
-                exchange_order_id = str(row.get("order_id") or row.get("orderId") or "")
-            acks.append(
-                OrderAck(
-                    True,
-                    request.client_order_id,
-                    exchange_order_id,
-                    OrderStatus.OPEN,
-                    "bitmart batch accepted",
-                    data,
-                )
-            )
+            row = rows_by_client_order_id.get(request.client_order_id)
+            if row is None:
+                row = rows[idx] if idx < len(rows) else None
+            acks.append(self._batch_order_ack(request, row, data))
         return acks
 
     async def cancel_order(self, request: CancelRequest) -> CancelAck:
@@ -365,6 +363,72 @@ class BitMartRestGateway(ExchangeGateway):
         if request.price is not None:
             row["price"] = decimal_to_str(request.price)
         return row
+
+    @staticmethod
+    def _batch_order_ack(request: OrderRequest, row: Any, raw: Dict[str, Any]) -> OrderAck:
+        if row is None:
+            return OrderAck(
+                False,
+                request.client_order_id,
+                None,
+                OrderStatus.UNKNOWN,
+                "bitmart batch response missing row",
+                raw,
+            )
+        if isinstance(row, str):
+            if row:
+                return OrderAck(True, request.client_order_id, row, OrderStatus.OPEN, "bitmart batch accepted", raw)
+            return OrderAck(
+                False,
+                request.client_order_id,
+                None,
+                OrderStatus.UNKNOWN,
+                "bitmart batch response missing exchange order id",
+                raw,
+            )
+        if not isinstance(row, dict):
+            return OrderAck(
+                False,
+                request.client_order_id,
+                None,
+                OrderStatus.UNKNOWN,
+                "bitmart batch response row has unexpected shape",
+                raw,
+            )
+        error = BitMartRestGateway._batch_row_error(row)
+        exchange_order_id = str(row.get("order_id") or row.get("orderId") or row.get("orderID") or "")
+        if error:
+            return OrderAck(False, request.client_order_id, exchange_order_id or None, OrderStatus.UNKNOWN, error, raw)
+        if not exchange_order_id:
+            return OrderAck(
+                False,
+                request.client_order_id,
+                None,
+                OrderStatus.UNKNOWN,
+                "bitmart batch response missing exchange order id",
+                raw,
+            )
+        return OrderAck(True, request.client_order_id, exchange_order_id, OrderStatus.OPEN, "bitmart batch accepted", raw)
+
+    @staticmethod
+    def _batch_row_error(row: Dict[str, Any]) -> str:
+        if row.get("success") is False:
+            return str(row.get("message") or row.get("msg") or "bitmart batch row rejected")
+        error_code = row.get("errorCode") or row.get("error_code")
+        if error_code:
+            return "bitmart batch row error {0}: {1}".format(
+                error_code,
+                row.get("message") or row.get("msg") or row.get("errorMessage") or "",
+            ).strip()
+        code = row.get("code")
+        if code is not None and str(code) not in {"0", "1000"}:
+            return "bitmart batch row code {0}: {1}".format(code, row.get("message") or row.get("msg") or "").strip()
+        status = str(row.get("status") or row.get("state") or "").lower()
+        if status in {"failed", "rejected", "error"}:
+            return str(row.get("message") or row.get("msg") or "bitmart batch row rejected")
+        if row.get("error"):
+            return str(row.get("error"))
+        return ""
 
     @staticmethod
     def _parse_order_update(item: Dict[str, Any]) -> OrderUpdate:

@@ -118,6 +118,7 @@ class AppSettings:
     order_store_path: str
     strategy_state_path: str
     risk_state_path: str
+    runtime_command_path: str
     private_stream_enabled: bool
     risk: RiskSettings
     market_rules: Dict[str, MarketRule]
@@ -153,6 +154,7 @@ class AppSettings:
             order_store_path=str(data.get("order_store_path", "runtime/orders.json")),
             strategy_state_path=str(data.get("strategy_state_path", "runtime/strategy_state.json")),
             risk_state_path=str(data.get("risk_state_path", "runtime/risk_state.json")),
+            runtime_command_path=str(data.get("runtime_command_path", "runtime/commands.json")),
             private_stream_enabled=bool(data.get("private_stream_enabled", trading_mode != TradingMode.PAPER)),
             risk=RiskSettings.from_config(data["risk"]),
             market_rules=market_rules,

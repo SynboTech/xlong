@@ -19,6 +19,10 @@ VALID_TRANSITIONS: Dict[OrderStatus, Set[OrderStatus]] = {
     OrderStatus.SUBMITTING: {
         OrderStatus.ACKED,
         OrderStatus.OPEN,
+        OrderStatus.PARTIALLY_FILLED,
+        OrderStatus.FILLED,
+        OrderStatus.CANCELED,
+        OrderStatus.PARTIALLY_CANCELED,
         OrderStatus.REJECTED,
         OrderStatus.UNKNOWN,
     },
@@ -72,4 +76,3 @@ def can_transition(current: OrderStatus, new: OrderStatus) -> bool:
     if is_terminal(current):
         return False
     return new in VALID_TRANSITIONS.get(current, set())
-

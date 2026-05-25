@@ -23,6 +23,7 @@ class AdminStrategyDeleteTest(unittest.TestCase):
         self.admin.EVENTS_PATH = os.path.join(root, "events.jsonl")
         self.admin.STRATEGY_STATE_PATH = os.path.join(root, "strategy_state.json")
         self.admin.RISK_STATE_PATH = os.path.join(root, "risk_state.json")
+        self.admin.RUNTIME_COMMANDS_PATH = os.path.join(root, "commands.json")
         self._write(
             self.admin.CONFIG_PATH,
             {
@@ -99,6 +100,78 @@ class AdminStrategyDeleteTest(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["status"], "paused")
         self.assertEqual(len(result["cancel_plan"]["requests"]), 1)
+
+    def test_live_stop_cancel_execute_queues_runtime_command(self):
+        old_env = {key: os.environ.get(key) for key in ["BITMART_API_KEY", "BITMART_API_SECRET", "BITMART_API_MEMO"]}
+        os.environ["BITMART_API_KEY"] = "key"
+        os.environ["BITMART_API_SECRET"] = "secret"
+        os.environ["BITMART_API_MEMO"] = "memo"
+        try:
+            self._write(
+                self.admin.CONFIG_PATH,
+                {
+                    "trading_mode": "live",
+                    "live_confirm": True,
+                    "enable_order_submission": True,
+                    "exchange": "bitmart",
+                    "symbols": ["BTC_USDT"],
+                    "risk": {
+                        "max_order_value_usdt": "10",
+                        "max_total_open_value_usdt": "50",
+                        "max_open_orders": 10,
+                        "max_position_base": "0.02",
+                        "max_daily_loss_usdt": "20",
+                        "max_price_deviation_bps": "50",
+                    },
+                    "market_rules": {
+                        "BTC_USDT": {
+                            "base": "BTC",
+                            "quote": "USDT",
+                            "price_increment": "0.01",
+                            "size_increment": "0.000001",
+                            "base_min_size": "0.000001",
+                            "min_notional": "1",
+                        }
+                    },
+                    "paper": {},
+                    "security": {
+                        "api_key_no_withdraw_permission_ack": True,
+                        "api_key_ip_whitelist_ack": True,
+                        "production_runbook_ack": True,
+                    },
+                    "strategies": [
+                        {"id": "range-buy", "name": "range_rebalance", "symbol": "BTC_USDT", "enabled": True, "params": {}}
+                    ],
+                },
+            )
+            self._write(
+                self.admin.ORDERS_PATH,
+                {
+                    "orders": [
+                        {
+                            "strategy": "range-buy",
+                            "status": "open",
+                            "symbol": "BTC_USDT",
+                            "client_order_id": "cid-live",
+                            "exchange_order_id": "remote-live",
+                        }
+                    ]
+                },
+            )
+            result = self.admin.stop_cancel_strategy({"key": "range-buy", "execute": True})
+            self.assertTrue(result["ok"])
+            self.assertTrue(result["queued"])
+            self.assertFalse(result["executed"])
+            commands = self.admin.read_json_file(self.admin.RUNTIME_COMMANDS_PATH, {"commands": []})["commands"]
+            self.assertEqual(commands[0]["type"], "stop_cancel_strategy")
+            self.assertEqual(commands[0]["status"], "pending")
+            self.assertEqual(commands[0]["requests"][0]["client_order_id"], "cid-live")
+        finally:
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_reconcile_diffs_mark_unknown_gate(self):
         diffs = self.admin.build_reconcile_diffs(
