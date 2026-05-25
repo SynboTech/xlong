@@ -4,7 +4,7 @@ services:
     environment:
       - PYTHONPATH=/app/src
     volumes:
-      - ./runtime:/app/runtime
+      - ${RUNTIME_DIR:-./runtime}:/app/runtime
     command: ["python", "-m", "mm.main", "--config", "config/paper.json"]
 
   admin:
@@ -13,19 +13,20 @@ services:
       - PYTHONPATH=/app/src
       - ADMIN_HOST=0.0.0.0
       - ADMIN_PORT=8765
-      - ADMIN_TOKEN=admin-test
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin-test
-      - ADMIN_ROLE=admin
-      - ADMIN_OPERATOR_USERNAME=operator
-      - ADMIN_OPERATOR_PASSWORD=operator-test
-      - ADMIN_OPERATOR_ROLE=operator
-      - ADMIN_VIEWER_USERNAME=viewer
-      - ADMIN_VIEWER_PASSWORD=viewer-test
-      - ADMIN_VIEWER_ROLE=viewer
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-admin-test}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin-test}
+      - ADMIN_ROLE=${ADMIN_ROLE:-admin}
+      - ADMIN_OPERATOR_USERNAME=${ADMIN_OPERATOR_USERNAME:-operator}
+      - ADMIN_OPERATOR_PASSWORD=${ADMIN_OPERATOR_PASSWORD:-operator-test}
+      - ADMIN_OPERATOR_ROLE=${ADMIN_OPERATOR_ROLE:-operator}
+      - ADMIN_VIEWER_USERNAME=${ADMIN_VIEWER_USERNAME:-viewer}
+      - ADMIN_VIEWER_PASSWORD=${ADMIN_VIEWER_PASSWORD:-viewer-test}
+      - ADMIN_VIEWER_ROLE=${ADMIN_VIEWER_ROLE:-viewer}
+      - ADMIN_AUDIT_SECRET=${ADMIN_AUDIT_SECRET:-admin-audit-dev-secret}
     ports:
-      - "8765:8765"
+      - "${ADMIN_PUBLIC_PORT:-8765}:8765"
     volumes:
-      - ./runtime:/app/runtime
-      - ./config:/app/config
+      - ${RUNTIME_DIR:-./runtime}:/app/runtime
+      - ${CONFIG_DIR:-./config}:/app/config
     command: ["python", "scripts/admin_server.py"]
