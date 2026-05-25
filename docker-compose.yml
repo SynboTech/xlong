@@ -6,3 +6,17 @@ services:
     volumes:
       - ./runtime:/app/runtime
     command: ["python", "-m", "mm.main", "--config", "config/paper.json"]
+
+  admin:
+    build: .
+    environment:
+      - PYTHONPATH=/app/src
+      - ADMIN_HOST=0.0.0.0
+      - ADMIN_PORT=8765
+      - ADMIN_TOKEN=admin-test
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./runtime:/app/runtime
+      - ./config:/app/config
+    command: ["python", "scripts/admin_server.py"]

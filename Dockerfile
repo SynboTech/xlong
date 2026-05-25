@@ -6,6 +6,7 @@ COPY src ./src
 COPY config ./config
 COPY scripts ./scripts
 COPY docs ./docs
+COPY index.html ./index.html
 
 ENV PYTHONPATH=/app/src
 RUN chmod +x scripts/*.sh scripts/*.py

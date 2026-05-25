@@ -1469,9 +1469,11 @@ def event_summary():
 
 def main():
     port = int(os.environ.get("ADMIN_PORT", "8765"))
+    host = os.environ.get("ADMIN_HOST", "127.0.0.1")
     security = admin_security()
-    server = ThreadingHTTPServer(("127.0.0.1", port), AdminHandler)
-    print("Admin server running at http://127.0.0.1:{0}/".format(port), flush=True)
+    server = ThreadingHTTPServer((host, port), AdminHandler)
+    display_host = "127.0.0.1" if host == "0.0.0.0" else host
+    print("Admin server running at http://{0}:{1}/".format(display_host, port), flush=True)
     if os.path.exists(ADMIN_TOKEN_PATH) and not os.environ.get("ADMIN_TOKEN"):
         print("Local admin token file: {0}".format(ADMIN_TOKEN_PATH), flush=True)
     print("Admin audit log: {0}".format(security.audit_path), flush=True)
