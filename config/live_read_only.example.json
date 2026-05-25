@@ -1,0 +1,42 @@
+{
+  "trading_mode": "live_read_only",
+  "live_confirm": false,
+  "enable_order_submission": false,
+  "exchange": "bitmart",
+  "symbols": ["BTC_USDT"],
+  "quote_interval_ms": 500,
+  "min_requote_interval_ms": 1000,
+  "stale_market_data_ms": 3000,
+  "cancel_on_shutdown": false,
+  "event_log_path": "runtime/live-read-only-events.jsonl",
+  "order_store_path": "runtime/live-read-only-orders.db",
+  "private_stream_enabled": true,
+  "risk": {
+    "max_order_value_usdt": "10",
+    "max_total_open_value_usdt": "50",
+    "max_open_orders": 10,
+    "max_position_base": "0.02",
+    "max_daily_loss_usdt": "20",
+    "max_price_deviation_bps": "50",
+    "per_strategy_max_order_value_usdt": {},
+    "per_strategy_max_open_orders": {},
+    "per_strategy_max_open_value_usdt": {}
+  },
+  "market_rules": {
+    "BTC_USDT": {
+      "base": "BTC",
+      "quote": "USDT",
+      "price_increment": "0.01",
+      "size_increment": "0.000001",
+      "base_min_size": "0.000001",
+      "min_notional": "1"
+    }
+  },
+  "paper": {},
+  "security": {
+    "api_key_no_withdraw_permission_ack": false,
+    "api_key_ip_whitelist_ack": false,
+    "production_runbook_ack": false
+  },
+  "strategies": []
+}

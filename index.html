@@ -1,0 +1,1949 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>XLong Market Maker Admin Console</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #eef3f4;
+        --sidebar: #102025;
+        --surface: #ffffff;
+        --surface-soft: #f7fafb;
+        --ink: #142126;
+        --muted: #607078;
+        --line: #d7e1e4;
+        --line-strong: #b7c7cc;
+        --green: #13734d;
+        --green-soft: #eaf7f1;
+        --amber: #a55b00;
+        --amber-soft: #fff4e3;
+        --red: #b42318;
+        --red-soft: #fff0ed;
+        --blue: #1769aa;
+        --blue-soft: #edf5fb;
+        --teal: #0d7268;
+        --teal-soft: #e8f6f4;
+        --shadow: 0 12px 28px rgba(24, 44, 50, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+      }
+
+      aside {
+        background: var(--sidebar);
+        color: #e7f2f3;
+        padding: 18px 14px;
+      }
+
+      .brand {
+        padding: 8px 10px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+      }
+
+      .brand-title {
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .brand-sub {
+        margin-top: 6px;
+        color: #a9bdc3;
+        font-size: 12px;
+      }
+
+      .nav {
+        padding: 14px 0;
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-link {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #d7e7ea;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .nav-link.active,
+      .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #7fc7a3;
+        flex: 0 0 auto;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: rgba(248, 251, 251, 0.96);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(8px);
+      }
+
+      .topbar {
+        min-height: 78px;
+        padding: 14px 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.15;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .top-status {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .content {
+        padding: 22px 24px 38px;
+      }
+
+      .page {
+        display: none;
+      }
+
+      .page.active {
+        display: block;
+      }
+
+      .page-title {
+        margin-bottom: 14px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .page-title h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric,
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .metric {
+        padding: 14px;
+        min-height: 104px;
+      }
+
+      .metric label,
+      .field label,
+      .mini-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 9px;
+        font-size: 25px;
+        line-height: 1;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 9px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid.two {
+        grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .panel {
+        overflow: hidden;
+      }
+
+      .panel-head {
+        min-height: 52px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--surface-soft);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-head h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .panel-body {
+        padding: 16px;
+      }
+
+      .btn {
+        min-height: 36px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .btn.primary {
+        border-color: #95bea9;
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .btn.danger {
+        border-color: #f0b6ad;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .btn.blue {
+        border-color: #b8d4ea;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .badge.ok {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .badge.warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .badge.bad {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .badge.info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .table th,
+      .table td {
+        padding: 10px 9px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .table th {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        background: #fbfdfd;
+      }
+
+      .table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+
+      .check-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .check-row input {
+        width: 16px;
+        min-height: 16px;
+      }
+
+      .form-actions,
+      .segmented {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .inline-status {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chart-box {
+        height: 320px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdfd;
+        overflow: hidden;
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .command {
+        margin: 0;
+        padding: 14px;
+        background: #0f171a;
+        color: #d8f3e7;
+        border-radius: 8px;
+        overflow: auto;
+        font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .doc-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .doc-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        text-decoration: none;
+        background: #fff;
+      }
+
+      .doc-card strong,
+      .doc-card span {
+        display: block;
+      }
+
+      .doc-card span {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toast {
+        min-height: 24px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .login-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(16, 32, 37, 0.72);
+      }
+
+      .login-shell.hidden {
+        display: none;
+      }
+
+      .login-panel {
+        width: min(420px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .login-panel .panel-body {
+        display: grid;
+        gap: 12px;
+      }
+
+      .auth-locked {
+        filter: blur(1px);
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .notice {
+        border: 1px solid #d5e5ea;
+        background: #f6fafb;
+        color: var(--muted);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 1180px) {
+        .metrics,
+        .grid.three {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .grid.two {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 780px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics,
+        .form-grid,
+        .doc-grid,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .page-title {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loginShell" class="login-shell hidden">
+      <div class="login-panel">
+        <div class="panel-head">
+          <h3>Admin 认证</h3>
+          <span class="badge info">RBAC</span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="adminTokenInput">Admin Token</label>
+            <input id="adminTokenInput" type="password" autocomplete="current-password" />
+          </div>
+          <button class="btn primary" id="adminLoginBtn" type="button">登录控制台</button>
+          <div id="loginStatus" class="inline-status">本地开发 token 位于 runtime/admin_token.json；生产环境使用 ADMIN_TOKEN。</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="appRoot" class="app">
+      <aside>
+        <div class="brand">
+          <div class="brand-title">XLong Admin</div>
+          <div class="brand-sub">BitMart-first no-code console</div>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <button class="nav-link active" data-page="overview" type="button"><span class="dot"></span>系统总览</button>
+          <button class="nav-link" data-page="exchanges" type="button"><span class="dot"></span>交易所账号</button>
+          <button class="nav-link" data-page="markets" type="button"><span class="dot"></span>交易对市场</button>
+          <button class="nav-link" data-page="strategies" type="button"><span class="dot"></span>策略中心</button>
+          <button class="nav-link" data-page="orders" type="button"><span class="dot"></span>订单中心</button>
+          <button class="nav-link" data-page="inventory" type="button"><span class="dot"></span>成交与库存</button>
+          <button class="nav-link" data-page="risk" type="button"><span class="dot"></span>风控后台</button>
+          <button class="nav-link" data-page="audit" type="button"><span class="dot"></span>审计与报告</button>
+        </nav>
+      </aside>
+
+      <div class="main">
+        <header>
+          <div class="topbar">
+            <div>
+              <h1>做市交易控制台</h1>
+              <div class="subtitle">账号、交易对、策略、订单、风控一站式操作</div>
+            </div>
+            <div class="top-status">
+              <span id="modeBadge" class="badge info">paper</span>
+              <span id="exchangeBadge" class="badge warn">exchange --</span>
+              <span id="riskBadge" class="badge ok">risk guarded</span>
+              <span id="authBadge" class="badge info">auth --</span>
+              <button class="btn danger" id="killSwitchBtn" type="button">暂停新单</button>
+              <button class="btn" id="logoutBtn" type="button">退出</button>
+            </div>
+          </div>
+        </header>
+
+        <main class="content">
+          <div id="toast" class="toast">正在加载控制台数据...</div>
+
+          <section id="page-overview" class="page active">
+            <div class="page-title">
+              <h2>系统总览</h2>
+              <button class="btn blue" id="reloadBtn" type="button">刷新</button>
+            </div>
+            <div class="metrics">
+              <article class="metric"><label>验收状态</label><strong id="statusPill">--</strong><span>Acceptance report</span></article>
+              <article class="metric"><label>测试数量</label><strong id="tests">--</strong><span>Unit tests</span></article>
+              <article class="metric"><label>交易所账号</label><strong id="exchangeCount">--</strong><span>Configured accounts</span></article>
+              <article class="metric"><label>策略实例</label><strong id="strategyCount">--</strong><span>Strategy instances</span></article>
+              <article class="metric"><label>Open Orders</label><strong id="openOrders">--</strong><span>Local store</span></article>
+              <article class="metric"><label>今日成交</label><strong id="fillCount">--</strong><span>Paper fills</span></article>
+            </div>
+            <div class="grid two" style="margin-top: 16px">
+              <div class="panel">
+                <div class="panel-head">
+                  <h3>价格曲线</h3>
+                  <div class="segmented" style="margin-top: 0">
+                    <select id="marketSymbolSelect" aria-label="价格曲线交易对" style="min-width: 170px"></select>
+                    <span id="marketLatest" class="badge info">--</span>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <div class="chart-box"><canvas id="priceChart"></canvas></div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head">
+                  <h3>运行状态</h3>
+                  <span id="healthBadge" class="badge warn">loading</span>
+                </div>
+                <div class="panel-body table-wrap">
+                  <table class="table">
+                    <tbody>
+                      <tr><th>Config SHA-256</th><td id="configHash">--</td></tr>
+                      <tr><th>Exchange</th><td id="exchange">--</td></tr>
+                      <tr><th>Symbols</th><td id="symbolsText">--</td></tr>
+                      <tr><th>Risk Limits</th><td id="riskLimits">--</td></tr>
+                      <tr><th>Order Store</th><td id="ordersCell">--</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="panel" style="margin-top: 16px">
+              <div class="panel-head">
+                <h3>策略详情页</h3>
+                <span id="strategyDetailBadge" class="badge info">未选择</span>
+              </div>
+              <div class="panel-body" id="strategyDetailBody">
+                <div class="notice">点击策略实例里的“详情”，查看策略级 PnL、风控限额、运行指标、订单和成交。</div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-exchanges" class="page">
+            <div class="page-title">
+              <h2>交易所账号</h2>
+              <button class="btn blue" id="testExchangeBtn" type="button">测试连接</button>
+            </div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>账号配置</h3><span class="badge info">BitMart</span></div>
+                <div class="panel-body">
+                  <div class="form-grid">
+                    <div class="field"><label for="exchangeInput">交易所</label><select id="exchangeInput"><option value="bitmart">BitMart</option><option value="binance">Binance</option><option value="okx">OKX</option><option value="bybit">Bybit</option></select></div>
+                    <div class="field"><label for="accountNameInput">账号名</label><input id="accountNameInput" value="BitMart Main" /></div>
+                    <div class="field"><label for="accountModeInput">模式</label><select id="accountModeInput"><option value="paper">paper</option><option value="live_read_only">live_read_only</option><option value="live_dry_run">live_dry_run</option><option value="live">live</option></select></div>
+                    <div class="field"><label for="restEndpointInput">REST Endpoint</label><input id="restEndpointInput" value="https://api-cloud.bitmart.com" /></div>
+                    <div class="field"><label for="publicWsInput">Public WS</label><input id="publicWsInput" value="wss://ws-manager-compress.bitmart.com/api?protocol=1.1" /></div>
+                    <div class="field"><label for="privateWsInput">Private WS</label><input id="privateWsInput" value="wss://ws-manager-compress.bitmart.com/user?protocol=1.1" /></div>
+                    <div class="field"><label for="apiKeyInput">API Key</label><input id="apiKeyInput" autocomplete="off" placeholder="保存后仅保留后四位" /></div>
+                    <div class="field"><label for="apiSecretInput">API Secret</label><input id="apiSecretInput" autocomplete="off" type="password" placeholder="不返回前端明文" /></div>
+                    <div class="field"><label for="memoInput">Memo / Passphrase</label><input id="memoInput" autocomplete="off" type="password" /></div>
+                  </div>
+                  <div class="form-actions">
+                    <label class="check-row"><input id="readOnlyInput" type="checkbox" checked />只读模式</label>
+                    <label class="check-row"><input id="orderSubmitInput" type="checkbox" />允许下单</label>
+                    <label class="check-row"><input id="noWithdrawInput" type="checkbox" />无提现权限</label>
+                    <label class="check-row"><input id="ipWhitelistInput" type="checkbox" />IP 白名单</label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn primary" id="saveExchangeBtn" type="button">保存账号</button>
+                    <span id="exchangeStatus" class="inline-status">runtime/exchanges.json</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>账号列表</h3><span id="exchangeSummary" class="badge warn">--</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table">
+                    <thead><tr><th>账号</th><th>模式</th><th>REST</th><th>WS</th><th>下单</th></tr></thead>
+                    <tbody id="exchangeRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-markets" class="page">
+            <div class="page-title">
+              <h2>交易对市场</h2>
+              <button class="btn blue" id="refreshMarketBtn" type="button">同步行情</button>
+            </div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>目标交易对</h3><span class="badge ok">editable</span></div>
+                <div class="panel-body">
+                  <div class="form-grid">
+                    <div class="field"><label for="symbolInput">交易对</label><input id="symbolInput" value="BTC_USDT" /></div>
+                    <div class="field"><label for="baseInput">Base</label><input id="baseInput" value="BTC" /></div>
+                    <div class="field"><label for="quoteInput">Quote</label><input id="quoteInput" value="USDT" /></div>
+                    <div class="field"><label for="priceIncrementInput">价格精度</label><input id="priceIncrementInput" value="0.01" /></div>
+                    <div class="field"><label for="sizeIncrementInput">数量精度</label><input id="sizeIncrementInput" value="0.000001" /></div>
+                    <div class="field"><label for="minNotionalInput">最小成交额</label><input id="minNotionalInput" value="1" /></div>
+                    <div class="field"><label for="initialPriceInput">模拟初始价</label><input id="initialPriceInput" value="68000" /></div>
+                  </div>
+                  <div class="form-actions">
+                    <button class="btn primary" id="saveSymbolBtn" type="button">保存交易对</button>
+                    <button class="btn" id="newSymbolBtn" type="button">新建交易对</button>
+                    <span id="symbolSaveStatus" class="inline-status">config/paper.json</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>市场列表</h3><span id="symbolSummary" class="badge info">--</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table">
+                    <thead><tr><th>交易对</th><th>交易所</th><th>最新价</th><th>规则</th><th>联动</th><th>管理</th></tr></thead>
+                    <tbody id="symbolRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-strategies" class="page">
+            <div class="page-title">
+              <h2>策略中心</h2>
+              <span class="badge ok">plugin-based</span>
+            </div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>创建 / 修改策略实例</h3><span class="badge info">no-code</span></div>
+                <div class="panel-body">
+                  <div class="form-grid">
+                    <div class="field"><label for="strategyTemplateInput">策略模板</label><select id="strategyTemplateInput"><option value="basic_mm">basic_mm · 已接入</option><option value="inventory_skew">inventory_skew · 已接入</option><option value="ladder_mm">ladder_mm · 已接入</option><option value="volatility_spread">volatility_spread · 已接入</option><option value="hedged_mm">hedged_mm · 已接入</option><option value="range_rebalance">range_rebalance · 已接入</option><option value="microprice_mm">microprice_mm · 已接入</option><option value="order_book_imbalance">order_book_imbalance · 已接入</option><option value="avellaneda_stoikov">avellaneda_stoikov · 已接入</option></select></div>
+                    <div class="field"><label for="strategyInstanceInput">策略实例 ID</label><input id="strategyInstanceInput" type="text" placeholder="留空自动生成" /></div>
+                    <div class="field"><label for="strategySymbolInput">交易对</label><select id="strategySymbolInput"></select></div>
+                    <div class="field"><label for="strategyEnabledInput">启用配置</label><select id="strategyEnabledInput"><option value="true">true</option><option value="false">false</option></select></div>
+                  </div>
+                  <div class="notice" id="strategyTemplateHint" style="margin-top: 12px">选择策略模板后展示对应参数。</div>
+                  <div class="form-grid" id="strategyParamsGrid" style="margin-top: 12px"></div>
+                  <div class="form-actions">
+                    <button class="btn primary" id="saveStrategyBtn" type="button">保存策略</button>
+                    <span id="strategySaveStatus" class="inline-status">写入策略配置</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>策略实例</h3><span id="strategySummary" class="badge warn">--</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table">
+                    <thead><tr><th>实例</th><th>状态</th><th>参数</th><th>操作</th></tr></thead>
+                    <tbody id="strategyRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-orders" class="page">
+            <div class="page-title">
+              <h2>订单中心</h2>
+              <div class="segmented" style="margin-top: 0">
+                <button class="btn blue order-tab" data-source="local" type="button">本地订单</button>
+                <button class="btn order-tab" data-source="remote" type="button">远端订单</button>
+                <button class="btn order-tab" data-source="reconcile" type="button">对账差异</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <h3 id="ordersTitle">本地订单库</h3>
+                <span id="ordersSummary" class="badge info">--</span>
+              </div>
+              <div class="panel-body">
+                <div class="form-actions" style="margin-top: 0">
+                  <button class="btn blue" id="refreshOrdersBtn" type="button">刷新订单</button>
+                  <button class="btn danger" id="cancelPlanBtn" type="button">生成撤单计划</button>
+                  <span id="orderActionStatus" class="inline-status">默认显示当前挂单；可切换查看历史订单</span>
+                </div>
+                <div class="form-actions">
+                  <button class="btn blue order-status-filter" data-filter="open" type="button">当前挂单</button>
+                  <button class="btn order-status-filter" data-filter="all" type="button">全部订单</button>
+                  <button class="btn order-status-filter" data-filter="filled" type="button">已成交</button>
+                  <button class="btn order-status-filter" data-filter="terminal" type="button">已撤 / 终态</button>
+                  <button class="btn order-status-filter" data-filter="unknown" type="button">异常</button>
+                  <div class="field" style="min-width: 220px">
+                    <label for="orderStrategyFilter">策略筛选</label>
+                    <select id="orderStrategyFilter">
+                      <option value="all">全部策略</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="table-wrap" style="margin-top: 12px">
+                  <table class="table">
+                    <thead id="ordersHead"></thead>
+                    <tbody id="ordersRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-inventory" class="page">
+            <div class="page-title"><h2>成交与库存</h2><span id="fillSummary" class="badge info">--</span></div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>库存 / PnL</h3><span class="badge ok">paper</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table"><tbody id="inventoryRows"></tbody></table>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>成交列表</h3><span class="badge info">fills</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table">
+                    <thead><tr><th>Trade</th><th>Symbol</th><th>Side</th><th>Price</th><th>Size</th><th>Strategy</th></tr></thead>
+                    <tbody id="fillRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-risk" class="page">
+            <div class="page-title">
+              <h2>风控后台</h2>
+              <button class="btn danger" id="riskKillBtn" type="button">暂停新单</button>
+            </div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>风险限额</h3><span id="riskStateBadge" class="badge ok">--</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table"><tbody id="riskRows"></tbody></table>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>上线检查</h3><span id="liveReadyBadge" class="badge warn">--</span></div>
+                <div class="panel-body table-wrap">
+                  <table class="table"><tbody id="securityRows"></tbody></table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="page-audit" class="page">
+            <div class="page-title"><h2>审计与报告</h2><span id="reportBadge" class="badge warn">loading</span></div>
+            <div class="grid two">
+              <div class="panel">
+                <div class="panel-head"><h3>报告</h3><span class="badge info">docs</span></div>
+                <div class="panel-body doc-grid">
+                  <a class="doc-card" href="docs/acceptance_report.md"><strong>Acceptance Report</strong><span>验收输出</span></a>
+                  <a class="doc-card" href="docs/no_code_admin_console_spec.md"><strong>No-code Console Spec</strong><span>控制台规格</span></a>
+                  <a class="doc-card" href="docs/morning_acceptance_checklist.md"><strong>Morning Checklist</strong><span>验收清单</span></a>
+                  <a class="doc-card" href="docs/canary_runbook.md"><strong>Canary Runbook</strong><span>小额上线流程</span></a>
+                  <a class="doc-card" href="docs/current_implementation_status.md"><strong>Implementation Status</strong><span>实现状态</span></a>
+                  <a class="doc-card" href="runtime/events.jsonl"><strong>Event Log</strong><span>事件日志</span></a>
+                  <a class="doc-card" href="runtime/orders.json"><strong>Order Store</strong><span>订单库</span></a>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h3>运维命令</h3><span class="badge ok">local</span></div>
+                <div class="panel-body">
+                  <pre class="command">scripts/acceptance.sh 10
+PYTHONPATH=src python3 scripts/preflight.py --config config/paper.json
+PYTHONPATH=src python3 scripts/runtime_snapshot.py --config config/paper.json --ticks 2
+PYTHONPATH=src python3 scripts/backtest.py --config config/paper.json --events runtime/events.jsonl
+PYTHONPATH=src python3 scripts/pnl_report.py --events runtime/events.jsonl
+PYTHONPATH=src python3 scripts/canary_checklist.py --config config/live_dry_run.example.json --stage shadow
+PYTHONPATH=src python3 scripts/rate_limit_report.py</pre>
+                </div>
+              </div>
+            </div>
+            <div class="panel" style="margin-top: 16px">
+              <div class="panel-head"><h3>Admin 操作审计</h3><span id="adminAuditBadge" class="badge warn">--</span></div>
+              <div class="panel-body table-wrap">
+                <table class="table">
+                  <thead><tr><th>时间</th><th>用户</th><th>路径</th><th>状态</th><th>签名</th></tr></thead>
+                  <tbody id="adminAuditRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        config: null,
+        audit: null,
+        exchanges: null,
+        symbols: null,
+        strategies: null,
+        orders: null,
+        fills: null,
+        inventory: null,
+        risk: null,
+        securityAudit: null,
+        market: null,
+        strategyDetail: null,
+        currentMarketSymbol: null,
+        currentOrderSource: "local",
+        currentOrderStatusFilter: "open",
+        currentOrderStrategyFilter: "all",
+      };
+
+      const auth = {
+        token: localStorage.getItem("xlongAdminToken") || "",
+        user: null,
+      };
+
+      const OPEN_ORDER_STATUSES = new Set(["created", "submitting", "acked", "open", "partially_filled", "canceling"]);
+      const TERMINAL_ORDER_STATUSES = new Set(["filled", "canceled", "partially_canceled", "rejected", "expired"]);
+
+      const STRATEGY_TEMPLATES = {
+        basic_mm: {
+          title: "基础双边做市",
+          runtime: true,
+          hint: "持续在 fair price 两侧挂买卖单，核心参数是价差、订单大小、层数和层间距。",
+          fields: [
+            { key: "spread_bps", label: "基础价差 bps", value: "20" },
+            { key: "order_size", label: "每层订单数量", value: "0.00005" },
+            { key: "levels", label: "双边挂单层数", value: "2", type: "number" },
+            { key: "level_spacing_bps", label: "层间距 bps", value: "10" },
+            { key: "size_multiplier", label: "逐层数量倍数", value: "1.0" },
+          ],
+        },
+        inventory_skew: {
+          title: "库存偏移",
+          runtime: true,
+          hint: "不直接产生订单，而是根据当前库存偏离目标库存的程度，给报价引擎输出价格偏移。",
+          fields: [
+            { key: "target_base", label: "目标 Base 库存", value: "0.005" },
+            { key: "skew_bps_per_full_deviation", label: "满偏移调整 bps", value: "30" },
+          ],
+        },
+        ladder_mm: {
+          title: "多层盘口做市",
+          runtime: true,
+          hint: "用于更细的盘口阶梯，买卖两侧可以独立配置层数、数量增长和最远报价距离。",
+          fields: [
+            { key: "base_spread_bps", label: "起始价差 bps", value: "18" },
+            { key: "bid_levels", label: "买侧层数", value: "3", type: "number" },
+            { key: "ask_levels", label: "卖侧层数", value: "3", type: "number" },
+            { key: "base_order_size", label: "首层订单数量", value: "0.00004" },
+            { key: "level_spacing_bps", label: "层间距 bps", value: "8" },
+            { key: "size_multiplier", label: "逐层数量倍数", value: "1.15" },
+            { key: "max_distance_bps", label: "最远报价 bps", value: "80" },
+          ],
+        },
+        volatility_spread: {
+          title: "波动率自适应价差",
+          runtime: true,
+          hint: "根据短周期波动率自动扩大或收窄价差，用于行情快速波动时降低逆向成交风险。",
+          fields: [
+            { key: "base_spread_bps", label: "基础价差 bps", value: "18" },
+            { key: "volatility_window_ms", label: "波动窗口 ms", value: "60000", type: "number" },
+            { key: "volatility_multiplier", label: "波动放大倍数", value: "2.0" },
+            { key: "min_spread_bps", label: "最小价差 bps", value: "12" },
+            { key: "max_spread_bps", label: "最大价差 bps", value: "120" },
+            { key: "order_size", label: "订单数量", value: "0.00005" },
+            { key: "levels", label: "挂单层数", value: "2", type: "number" },
+          ],
+        },
+        hedged_mm: {
+          title: "对冲做市",
+          runtime: true,
+          hint: "主交易所做市，库存达到阈值后在对冲交易所执行对冲，重点控制对冲阈值和滑点。",
+          fields: [
+            { key: "spread_bps", label: "做市价差 bps", value: "22" },
+            { key: "order_size", label: "做市订单数量", value: "0.00005" },
+            { key: "hedge_exchange", label: "对冲交易所", value: "binance" },
+            { key: "hedge_threshold_base", label: "触发对冲库存", value: "0.001" },
+            { key: "max_hedge_slippage_bps", label: "最大对冲滑点 bps", value: "15" },
+            { key: "hedge_mode", label: "对冲模式", value: "reduce_inventory", type: "select", options: ["reduce_inventory", "delta_neutral", "manual_review"] },
+          ],
+        },
+        range_rebalance: {
+          title: "区间库存再平衡",
+          runtime: true,
+          hint: "在保护区间内，低于补库存价只挂被动买单，高于减库存价只挂被动卖单；突破硬保护价停止出单并让报价引擎撤掉旧槽位。",
+          fields: [
+            { key: "direction", label: "运行方向", value: "auto", type: "select", options: ["auto", "buy_only", "sell_only"] },
+            { key: "hard_floor", label: "下保护价", value: "0.90" },
+            { key: "buy_below", label: "低于此价补库存", value: "0.98" },
+            { key: "sell_above", label: "高于此价减库存", value: "1.03" },
+            { key: "hard_ceiling", label: "上保护价", value: "1.10" },
+            { key: "target_base", label: "目标 Base 库存", value: "0.005" },
+            { key: "buy_order_size", label: "补库存单笔数量", value: "0.00005" },
+            { key: "sell_order_size", label: "减库存单笔数量", value: "0.00005" },
+            { key: "levels", label: "分层数量", value: "1", type: "number" },
+            { key: "quote_offset_bps", label: "挂单偏移 bps", value: "2" },
+            { key: "level_spacing_bps", label: "分层间距 bps", value: "5" },
+          ],
+        },
+        microprice_mm: {
+          title: "Microprice 微价格做市",
+          runtime: true,
+          hint: "用 bid/ask 数量权重计算 fair price，比 mid price 更敏感地反映盘口短期压力。",
+          fields: [
+            { key: "depth_levels", label: "盘口深度档位", value: "5", type: "number" },
+            { key: "spread_bps", label: "基础价差 bps", value: "16" },
+            { key: "order_size", label: "每层订单数量", value: "0.00005" },
+            { key: "levels", label: "双边挂单层数", value: "2", type: "number" },
+            { key: "level_spacing_bps", label: "层间距 bps", value: "8" },
+            { key: "size_multiplier", label: "逐层数量倍数", value: "1.0" },
+          ],
+        },
+        order_book_imbalance: {
+          title: "盘口不平衡做市",
+          runtime: true,
+          hint: "根据买卖盘数量差调整 fair price，买盘强时整体报价上移，卖盘强时整体报价下移。",
+          fields: [
+            { key: "depth_levels", label: "盘口深度档位", value: "5", type: "number" },
+            { key: "base_spread_bps", label: "基础价差 bps", value: "18" },
+            { key: "imbalance_threshold", label: "不平衡阈值", value: "0.15" },
+            { key: "skew_bps", label: "最大偏移 bps", value: "24" },
+            { key: "spread_widen_bps", label: "强不平衡扩宽 bps", value: "8" },
+            { key: "order_size", label: "订单数量", value: "0.00005" },
+            { key: "levels", label: "挂单层数", value: "2", type: "number" },
+            { key: "level_spacing_bps", label: "层间距 bps", value: "8" },
+          ],
+        },
+        avellaneda_stoikov: {
+          title: "Avellaneda-Stoikov 最优做市",
+          runtime: true,
+          hint: "用短期波动率和库存偏离计算 reservation price，并动态扩大价差控制库存风险。",
+          fields: [
+            { key: "risk_aversion", label: "风险厌恶系数", value: "0.15" },
+            { key: "target_base", label: "目标 Base 库存", value: "0.01" },
+            { key: "max_inventory_base", label: "最大库存归一化", value: "0.01" },
+            { key: "base_spread_bps", label: "基础价差 bps", value: "16" },
+            { key: "min_spread_bps", label: "最小价差 bps", value: "12" },
+            { key: "max_spread_bps", label: "最大价差 bps", value: "120" },
+            { key: "sigma_window_ms", label: "波动窗口 ms", value: "60000", type: "number" },
+            { key: "time_horizon_ms", label: "风险时间窗 ms", value: "60000", type: "number" },
+            { key: "min_volatility_bps", label: "最小波动 bps", value: "5" },
+            { key: "inventory_risk_multiplier", label: "库存风险倍数", value: "1.0" },
+            { key: "volatility_spread_multiplier", label: "波动扩价倍数", value: "0.5" },
+            { key: "order_size", label: "订单数量", value: "0.00005" },
+            { key: "levels", label: "挂单层数", value: "2", type: "number" },
+            { key: "level_spacing_bps", label: "层间距 bps", value: "8" },
+          ],
+        },
+      };
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function esc(value) {
+        return String(value ?? "--").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char]));
+      }
+
+      function authHeaders(extra = {}) {
+        const headers = { ...extra };
+        if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
+        return headers;
+      }
+
+      async function apiGet(path) {
+        const res = await fetch(path, { cache: "no-store", headers: authHeaders() });
+        if (res.status === 401) {
+          showLogin("认证已失效，请重新登录");
+          throw new Error("admin authentication required");
+        }
+        if (!res.ok) throw new Error(`${path} ${res.status}`);
+        return res.json();
+      }
+
+      async function apiPost(path, payload) {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload),
+        });
+        if (res.status === 401) {
+          showLogin("认证已失效，请重新登录");
+          throw new Error("admin authentication required");
+        }
+        if (!res.ok) {
+          let message = `${path} ${res.status}`;
+          try {
+            const data = await res.json();
+            message = data.error || message;
+          } catch {}
+          throw new Error(message);
+        }
+        return res.json();
+      }
+
+      function showLogin(message = "") {
+        $("loginShell").classList.remove("hidden");
+        $("appRoot").classList.add("auth-locked");
+        if (message) $("loginStatus").textContent = message;
+      }
+
+      function hideLogin() {
+        $("loginShell").classList.add("hidden");
+        $("appRoot").classList.remove("auth-locked");
+      }
+
+      async function loginAdmin() {
+        const token = $("adminTokenInput").value.trim();
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          $("loginStatus").textContent = data.error || "登录失败";
+          return;
+        }
+        auth.token = token;
+        auth.user = data.user;
+        localStorage.setItem("xlongAdminToken", token);
+        $("adminTokenInput").value = "";
+        hideLogin();
+        await bootstrap();
+      }
+
+      function logoutAdmin() {
+        auth.token = "";
+        auth.user = null;
+        localStorage.removeItem("xlongAdminToken");
+        showLogin("已退出，请重新输入 Admin Token");
+      }
+
+      async function requireAuth() {
+        if (!auth.token) {
+          showLogin();
+          throw new Error("admin authentication required");
+        }
+        const data = await apiGet("/api/auth/me");
+        auth.user = data.user;
+        hideLogin();
+      }
+
+      function confirmPhrase(expected, message) {
+        const actual = window.prompt(`${message}\n\n请输入确认短语：${expected}`);
+        if (actual !== expected) throw new Error(`确认短语不匹配：${expected}`);
+        return expected;
+      }
+
+      function setToast(message) {
+        $("toast").textContent = message;
+      }
+
+      function badgeClass(value) {
+        if (["ok", "pass", "ready", "running", "open", "filled", "canceled", "partially_canceled", true].includes(value)) return "badge ok";
+        if (["bad", "fail", "locked", "unknown", false].includes(value)) return "badge bad";
+        return "badge warn";
+      }
+
+      function extractJsonBlock(text, heading) {
+        const idx = text.indexOf("## " + heading);
+        if (idx < 0) return null;
+        const rest = text.slice(idx);
+        const match = rest.match(/```json\n([\s\S]*?)\n```/);
+        if (!match) return null;
+        try {
+          return JSON.parse(match[1]);
+        } catch {
+          return null;
+        }
+      }
+
+      async function loadReport() {
+        const res = await fetch("docs/acceptance_report.md", { cache: "no-store", headers: authHeaders() });
+        if (res.status === 401) {
+          showLogin("认证已失效，请重新登录");
+          throw new Error("admin authentication required");
+        }
+        const text = await res.text();
+        const pass = text.includes("Status: **PASS**");
+        const testsMatch = text.match(/Ran\s+(\d+)\s+tests/);
+        const health = extractJsonBlock(text, "Health") || {};
+        $("statusPill").textContent = pass ? "PASS" : "CHECK";
+        $("tests").textContent = testsMatch ? testsMatch[1] : "--";
+        $("healthBadge").textContent = health.ok ? "healthy" : "check";
+        $("healthBadge").className = health.ok ? "badge ok" : "badge warn";
+        $("reportBadge").textContent = pass ? "pass" : "check";
+        $("reportBadge").className = pass ? "badge ok" : "badge warn";
+      }
+
+      async function loadAll() {
+        const [config, exchanges, symbols, strategies, orders, fills, inventory, risk] = await Promise.all([
+          apiGet("/api/config"),
+          apiGet("/api/exchanges"),
+          apiGet("/api/symbols"),
+          apiGet("/api/strategies"),
+          apiGet("/api/orders"),
+          apiGet("/api/fills"),
+          apiGet("/api/inventory"),
+          apiGet("/api/risk"),
+        ]);
+        state.config = config.config;
+        state.audit = config.audit;
+        state.exchanges = exchanges;
+        state.symbols = symbols;
+        state.strategies = strategies;
+        state.orders = orders;
+        state.fills = fills;
+        state.inventory = inventory;
+        state.risk = risk;
+        if (!state.currentMarketSymbol || !(state.config.symbols || []).includes(state.currentMarketSymbol)) {
+          state.currentMarketSymbol = state.config.symbols?.[0] || "BTC_USDT";
+        }
+        const symbol = state.currentMarketSymbol;
+        state.market = await apiGet(`/api/market/history?symbol=${encodeURIComponent(symbol)}&limit=180`);
+        if (auth.user?.role === "admin") {
+          state.securityAudit = await apiGet("/api/security/audit").catch((err) => ({ ok: false, error: err.message, events: [] }));
+        } else {
+          state.securityAudit = { ok: false, error: "admin role required", events: [] };
+        }
+        renderAll();
+        setToast("控制台数据已同步");
+      }
+
+      function renderAll() {
+        renderTop();
+        renderOverview();
+        renderExchanges();
+        renderSymbols();
+        renderStrategies();
+        renderOrders(state.orders);
+        renderInventory();
+        renderRisk();
+        renderSecurityAudit();
+        drawChart();
+      }
+
+      function renderTop() {
+        $("modeBadge").textContent = state.config?.trading_mode || "paper";
+        $("exchangeBadge").textContent = `${state.audit?.exchange || "--"} · ${state.exchanges?.summary?.connected ?? 0} connected`;
+        const safe = state.risk?.state?.safe_mode;
+        $("riskBadge").textContent = safe ? "SAFE_MODE" : "risk guarded";
+        $("riskBadge").className = safe ? "badge bad" : "badge ok";
+        $("authBadge").textContent = auth.user ? `${auth.user.role}:${auth.user.user}` : "auth --";
+      }
+
+      function renderOverview() {
+        $("exchangeCount").textContent = state.exchanges?.summary?.total ?? "--";
+        $("strategyCount").textContent = state.strategies?.strategies?.length ?? "--";
+        $("openOrders").textContent = state.orders?.summary?.open ?? "--";
+        $("fillCount").textContent = state.fills?.summary?.total ?? "--";
+        $("configHash").textContent = state.audit?.sha256 ? `${state.audit.sha256.slice(0, 20)}...` : "--";
+        $("exchange").textContent = state.audit?.exchange || "--";
+        $("symbolsText").textContent = (state.audit?.symbols || []).join(", ") || "--";
+        const risk = state.audit?.risk_limits;
+        $("riskLimits").textContent = risk ? `max order ${risk.max_order_value_usdt} USDT / max open ${risk.max_total_open_value_usdt} USDT` : "--";
+        const summary = state.orders?.summary || {};
+        const store = state.orders?.store || {};
+        $("ordersCell").textContent = `${summary.open || 0} open / ${summary.total || 0} total / ${summary.unknown || 0} unknown · ${store.type || "json"}`;
+        $("marketLatest").textContent = state.market?.latest ? `${state.market.symbol} ${state.market.latest.price}` : "--";
+        renderMarketSymbolSelect();
+      }
+
+      function renderMarketSymbolSelect() {
+        const select = $("marketSymbolSelect");
+        const symbols = state.config?.symbols || [];
+        if (!symbols.length) {
+          select.innerHTML = "";
+          return;
+        }
+        select.innerHTML = symbols.map((symbol) => {
+          const selected = symbol === state.currentMarketSymbol ? " selected" : "";
+          return `<option value="${esc(symbol)}"${selected}>${esc(symbol)}</option>`;
+        }).join("");
+      }
+
+      function renderExchanges() {
+        const accounts = state.exchanges?.accounts || [];
+        $("exchangeSummary").textContent = `${accounts.length} accounts`;
+        $("exchangeRows").innerHTML = accounts.map((account) => `
+          <tr>
+            <td>${esc(account.exchange)}<br><span class="mini-label">${esc(account.account_name)} · key ${account.api_key_configured ? "***" + esc(account.api_key_last4) : "未配置"}</span></td>
+            <td>${esc(account.mode)}</td>
+            <td><span class="${account.connection.rest === "ok" ? "badge ok" : "badge warn"}">${esc(account.connection.rest)}</span></td>
+            <td><span class="${account.connection.public_ws === "ok" ? "badge ok" : "badge warn"}">public ${esc(account.connection.public_ws)}</span><br><span class="${account.connection.private_ws === "ok" ? "badge ok" : "badge warn"}">private ${esc(account.connection.private_ws)}</span></td>
+            <td><span class="${account.connection.can_live_order ? "badge ok" : "badge bad"}">${account.connection.can_live_order ? "enabled" : "locked"}</span></td>
+          </tr>
+        `).join("");
+        if (accounts[0]) fillExchangeForm(accounts[0]);
+      }
+
+      function fillExchangeForm(account) {
+        $("exchangeInput").value = account.exchange || "bitmart";
+        $("accountNameInput").value = account.account_name || "BitMart Main";
+        $("accountModeInput").value = account.mode || "paper";
+        $("restEndpointInput").value = account.rest_endpoint || "";
+        $("publicWsInput").value = account.public_ws_endpoint || "";
+        $("privateWsInput").value = account.private_ws_endpoint || "";
+        $("readOnlyInput").checked = Boolean(account.read_only);
+        $("orderSubmitInput").checked = Boolean(account.allow_order_submission);
+        $("noWithdrawInput").checked = Boolean(account.no_withdraw_ack);
+        $("ipWhitelistInput").checked = Boolean(account.ip_whitelist_ack);
+      }
+
+      function renderSymbols() {
+        const symbols = state.symbols?.symbols || [];
+        $("symbolSummary").textContent = `${symbols.length} symbols`;
+        $("symbolRows").innerHTML = symbols.map((item) => `
+          <tr>
+            <td>${esc(item.symbol)}${item.symbol === state.currentMarketSymbol ? '<br><span class="badge info">当前行情</span>' : ""}</td>
+            <td>${esc(item.exchange)}</td>
+            <td>${item.latest_price ?? "--"}</td>
+            <td>price ${esc(item.rule?.price_increment)} / size ${esc(item.rule?.size_increment)} / min ${esc(item.rule?.min_notional)}</td>
+            <td>${item.strategy_count || 0} strategies<br>${item.order_count || 0} orders</td>
+            <td>
+              <button class="btn blue symbol-action" data-action="view" data-symbol="${esc(item.symbol)}" type="button">行情</button>
+              <button class="btn symbol-action" data-action="edit" data-symbol="${esc(item.symbol)}" type="button">编辑</button>
+              <button class="btn primary symbol-action" data-action="strategy" data-symbol="${esc(item.symbol)}" type="button">策略</button>
+              <button class="btn danger symbol-action" data-action="delete" data-symbol="${esc(item.symbol)}" type="button">删除</button>
+            </td>
+          </tr>
+        `).join("");
+        const selected = symbols.find((item) => item.symbol === state.currentMarketSymbol) || symbols[0];
+        if (selected) fillSymbolForm(selected);
+        $("strategySymbolInput").innerHTML = symbols.map((item) => `<option value="${esc(item.symbol)}">${esc(item.symbol)}</option>`).join("");
+      }
+
+      function fillSymbolForm(item) {
+        $("symbolInput").value = item.symbol;
+        $("baseInput").value = item.rule?.base || "BTC";
+        $("quoteInput").value = item.rule?.quote || "USDT";
+        $("priceIncrementInput").value = item.rule?.price_increment || "0.01";
+        $("sizeIncrementInput").value = item.rule?.size_increment || "0.000001";
+        $("minNotionalInput").value = item.rule?.min_notional || "1";
+        $("initialPriceInput").value = item.initial_price || item.latest_price || "1";
+      }
+
+      function clearSymbolForm() {
+        $("symbolInput").value = "";
+        $("baseInput").value = "";
+        $("quoteInput").value = "USDT";
+        $("priceIncrementInput").value = "0.00001";
+        $("sizeIncrementInput").value = "0.01";
+        $("minNotionalInput").value = "1";
+        $("initialPriceInput").value = "1";
+        $("symbolSaveStatus").textContent = "填写后保存，新交易对会联动到策略下拉和行情图";
+      }
+
+      function renderStrategyFields(templateName, params = {}) {
+        const template = STRATEGY_TEMPLATES[templateName] || STRATEGY_TEMPLATES.basic_mm;
+        $("strategyTemplateHint").textContent = `${template.title}：${template.hint} 已接入运行时，可保存并运行。`;
+        $("strategyParamsGrid").innerHTML = template.fields.map((field) => {
+          const value = params[field.key] ?? field.value;
+          if (field.type === "select") {
+            return `
+              <div class="field">
+                <label for="param-${esc(field.key)}">${esc(field.label)}</label>
+                <select id="param-${esc(field.key)}" data-param="${esc(field.key)}">
+                  ${(field.options || []).map((option) => `<option value="${esc(option)}"${String(value) === option ? " selected" : ""}>${esc(option)}</option>`).join("")}
+                </select>
+              </div>
+            `;
+          }
+          return `
+            <div class="field">
+              <label for="param-${esc(field.key)}">${esc(field.label)}</label>
+              <input id="param-${esc(field.key)}" data-param="${esc(field.key)}" type="${field.type || "text"}" value="${esc(value)}" />
+            </div>
+          `;
+        }).join("");
+      }
+
+      function collectStrategyParams(templateName) {
+        const template = STRATEGY_TEMPLATES[templateName] || STRATEGY_TEMPLATES.basic_mm;
+        const params = {};
+        template.fields.forEach((field) => {
+          const element = document.querySelector(`[data-param="${field.key}"]`);
+          if (!element) return;
+          params[field.key] = field.type === "number" ? Number(element.value) : element.value.trim();
+        });
+        return params;
+      }
+
+      function slugText(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "strategy";
+      }
+
+      function defaultStrategyInstanceId(name, symbol, params = {}) {
+        const direction = params.direction && params.direction !== "auto" ? `-${params.direction}` : "";
+        return slugText(`${name}-${symbol}${direction}`);
+      }
+
+      function summarizeStrategyParams(name, params = {}) {
+        if (name === "inventory_skew") {
+          return `target ${params.target_base ?? "--"} / skew ${params.skew_bps_per_full_deviation ?? "--"} bps`;
+        }
+        if (name === "ladder_mm") {
+          return `spread ${params.base_spread_bps ?? "--"} / bid ${params.bid_levels ?? "--"} / ask ${params.ask_levels ?? "--"} / spacing ${params.level_spacing_bps ?? "--"}`;
+        }
+        if (name === "volatility_spread") {
+          return `base ${params.base_spread_bps ?? "--"} / window ${params.volatility_window_ms ?? "--"}ms / max ${params.max_spread_bps ?? "--"}`;
+        }
+        if (name === "hedged_mm") {
+          return `spread ${params.spread_bps ?? "--"} / hedge ${params.hedge_exchange ?? "--"} / threshold ${params.hedge_threshold_base ?? "--"}`;
+        }
+        if (name === "range_rebalance") {
+          return `${params.direction ?? "auto"} / range ${params.hard_floor ?? "--"}-${params.hard_ceiling ?? "--"} / buy < ${params.buy_below ?? "--"} / sell > ${params.sell_above ?? "--"} / target ${params.target_base ?? "--"}`;
+        }
+        if (name === "microprice_mm") {
+          return `depth ${params.depth_levels ?? "1"} / microprice / spread ${params.spread_bps ?? "--"} / levels ${params.levels ?? "--"}`;
+        }
+        if (name === "order_book_imbalance") {
+          return `depth ${params.depth_levels ?? "1"} / imbalance ${params.imbalance_threshold ?? "--"} / skew ${params.skew_bps ?? "--"} / spread ${params.base_spread_bps ?? "--"}`;
+        }
+        if (name === "avellaneda_stoikov") {
+          return `risk ${params.risk_aversion ?? "--"} / target ${params.target_base ?? "--"} / spread ${params.min_spread_bps ?? "--"}-${params.max_spread_bps ?? "--"}`;
+        }
+        return `spread ${params.spread_bps ?? "--"} / size ${params.order_size ?? "--"} / levels ${params.levels ?? "--"}`;
+      }
+
+      function fillStrategyForm(item) {
+        if (!item) {
+          $("strategyInstanceInput").value = "";
+          renderStrategyFields($("strategyTemplateInput").value, {});
+          return;
+        }
+        $("strategyInstanceInput").value = item.id || "";
+        $("strategyTemplateInput").value = item.name;
+        $("strategySymbolInput").value = item.symbol;
+        $("strategyEnabledInput").value = String(item.enabled);
+        renderStrategyFields(item.name, item.params || {});
+      }
+
+      function renderStrategies() {
+        const items = state.strategies?.strategies || [];
+        $("strategySummary").textContent = `${items.length} instances`;
+        $("strategyRows").innerHTML = items.map((item) => `
+          <tr>
+            <td>${esc(item.name)}<br><span class="mini-label">${esc(item.key)} · ${esc(item.symbol)} · ${esc(item.mode)}</span></td>
+            <td><span class="${badgeClass(item.status)}">${esc(item.status)}</span><br><span class="mini-label">${item.metrics?.open_orders ?? item.open_orders} open / ${item.metrics?.unknown_orders ?? 0} unknown / ${item.metrics?.fills ?? item.fills} fills</span></td>
+            <td>${esc(summarizeStrategyParams(item.name, item.params))}<br><span class="mini-label">PnL cashflow ${esc(item.metrics?.cashflow_quote ?? "0")} / open ${esc(item.metrics?.open_notional ?? "0")}</span></td>
+            <td>
+              <button class="btn blue strategy-action" data-action="detail" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-symbol="${esc(item.symbol)}" type="button">详情</button>
+              <button class="btn primary strategy-action" data-action="start" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-symbol="${esc(item.symbol)}" type="button">启动</button>
+              <button class="btn danger strategy-action" data-action="pause" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-symbol="${esc(item.symbol)}" type="button">暂停</button>
+              <button class="btn danger strategy-action" data-action="stop_cancel" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-symbol="${esc(item.symbol)}" type="button">停止并撤单</button>
+              <button class="btn danger strategy-action" data-action="delete" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-symbol="${esc(item.symbol)}" data-open-orders="${esc(item.open_orders)}" type="button">删除</button>
+            </td>
+          </tr>
+        `).join("");
+        fillStrategyForm(items[0]);
+        if (state.strategyDetail) renderStrategyDetail();
+      }
+
+      function renderStrategyDetail() {
+        const detail = state.strategyDetail?.strategy;
+        if (!detail) {
+          $("strategyDetailBadge").textContent = "未选择";
+          $("strategyDetailBody").innerHTML = `<div class="notice">点击策略实例里的“详情”，查看策略级 PnL、风控限额、运行指标、订单和成交。</div>`;
+          return;
+        }
+        const metrics = detail.metrics || {};
+        const limits = metrics.risk_limits || {};
+        $("strategyDetailBadge").textContent = `${detail.key} · ${detail.status}`;
+        $("strategyDetailBadge").className = badgeClass(detail.status);
+        $("strategyDetailBody").innerHTML = `
+          <div class="grid three">
+            <div class="metric"><label>Open Orders</label><strong>${esc(metrics.open_orders ?? 0)}</strong><span>${esc(metrics.unknown_orders ?? 0)} unknown</span></div>
+            <div class="metric"><label>Open Notional</label><strong>${esc(metrics.open_notional ?? "0")}</strong><span>USDT shadow/local</span></div>
+            <div class="metric"><label>Cashflow PnL</label><strong>${esc(metrics.cashflow_quote ?? "0")}</strong><span>fills based estimate</span></div>
+          </div>
+          <div class="grid two" style="margin-top: 12px">
+            <div class="table-wrap">
+              <table class="table">
+                <tbody>
+                  <tr><th>策略</th><td>${esc(detail.name)} / ${esc(detail.symbol)} / ${esc(detail.mode)}</td></tr>
+                  <tr><th>风控限额</th><td>order ${esc(limits.max_order_value_usdt)} / open orders ${esc(limits.max_open_orders)} / open value ${esc(limits.max_open_value_usdt)}</td></tr>
+                  <tr><th>成交</th><td>${esc(metrics.fills ?? 0)} fills / base ${esc(metrics.filled_base ?? "0")} / quote ${esc(metrics.filled_quote ?? "0")}</td></tr>
+                  <tr><th>参数</th><td>${esc(JSON.stringify(detail.params || {}))}</td></tr>
+                  <tr><th>撤单计划</th><td>${esc(detail.cancel_plan?.requests?.length ?? 0)} open orders</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>订单</th><th>状态</th><th>价格 / 数量</th></tr></thead>
+                <tbody>${(detail.orders || []).slice(-8).reverse().map((order) => `
+                  <tr><td>${esc(order.client_order_id)}</td><td><span class="${badgeClass(order.status)}">${esc(order.status)}</span></td><td>${esc(order.price)} / ${esc(order.size)}</td></tr>
+                `).join("") || `<tr><td colspan="3">暂无订单</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      async function showStrategyDetail(key) {
+        const result = await apiGet(`/api/strategies/detail?key=${encodeURIComponent(key)}`);
+        if (!result.ok) throw new Error(result.error || "strategy detail failed");
+        state.strategyDetail = result;
+        renderStrategyDetail();
+        setToast(`策略详情已加载：${key}`);
+      }
+
+      async function stopCancelStrategy(key, name, symbol) {
+        const target = key || `${name}:${symbol}`;
+        const ok = window.confirm(`确认停止策略 ${target} 并生成撤单计划？`);
+        if (!ok) return;
+        const confirmation = confirmPhrase(`STOP CANCEL ${target}`, `确认停止策略 ${target} 并生成撤单计划？`);
+        const result = await apiPost("/api/strategies/stop-cancel", { key, name, symbol, execute: false, confirmation });
+        state.strategies = result.strategies || state.strategies;
+        $("strategySaveStatus").textContent = `${result.message} · ${result.cancel_plan?.requests?.length || 0} orders`;
+        await showStrategyDetail(result.key);
+        await refreshOrders("local");
+      }
+
+      function renderOrders(payload) {
+        const source = state.currentOrderSource;
+        const summary = payload?.summary || {};
+        const filter = state.currentOrderStatusFilter;
+        const strategyFilter = state.currentOrderStrategyFilter;
+        renderOrderStrategyOptions(payload?.orders || []);
+        document.querySelectorAll(".order-status-filter").forEach((btn) => btn.classList.toggle("blue", btn.dataset.filter === filter));
+        $("ordersSummary").textContent = source === "reconcile" ? `${payload?.diffs?.length || 0} diffs` : `${summary.open || 0} open / ${summary.total || 0} total`;
+        const strategyText = strategyFilter === "all" ? "全部策略" : strategyFilter;
+        $("ordersTitle").textContent = source === "remote" ? "远端订单" : source === "reconcile" ? "对账差异" : `本地订单库 · ${orderFilterLabel(filter)} · ${strategyText}`;
+        if (source === "reconcile") {
+          $("ordersHead").innerHTML = "<tr><th>类型</th><th>级别</th><th>Client ID</th><th>Symbol</th><th>说明</th></tr>";
+          $("ordersRows").innerHTML = (payload?.diffs || []).map((item) => `
+            <tr><td>${esc(item.type)}</td><td><span class="${item.severity === "critical" ? "badge bad" : item.severity === "warn" ? "badge warn" : "badge info"}">${esc(item.severity)}</span></td><td>${esc(item.client_order_id)}</td><td>${esc(item.symbol)}</td><td>${esc(item.message)}</td></tr>
+          `).join("");
+          return;
+        }
+        $("ordersHead").innerHTML = "<tr><th>Client ID</th><th>Symbol</th><th>Side</th><th>Status</th><th>Price</th><th>Size</th><th>Strategy</th></tr>";
+        const rows = filterOrders(payload?.orders || [], filter, strategyFilter).slice(-80).reverse();
+        $("ordersSummary").textContent = `${rows.length} shown / ${summary.open || 0} open / ${summary.total || 0} total`;
+        $("ordersRows").innerHTML = rows.length ? rows.map((order) => `
+          <tr>
+            <td>${esc(order.client_order_id)}</td>
+            <td>${esc(order.symbol)}</td>
+            <td>${esc(order.side)}</td>
+            <td><span class="${badgeClass(order.status)}">${esc(order.status)}</span></td>
+            <td>${esc(order.price)}</td>
+            <td>${esc(order.size)}</td>
+            <td>${esc(order.strategy)}</td>
+          </tr>
+        `).join("") : `<tr><td colspan="7">当前筛选下没有订单</td></tr>`;
+      }
+
+      function renderOrderStrategyOptions(orders) {
+        const select = $("orderStrategyFilter");
+        const strategyNames = new Set();
+        (state.strategies?.strategies || []).forEach((item) => {
+          const orderStrategy = item.id ? item.key : item.name;
+          if (orderStrategy) strategyNames.add(orderStrategy);
+        });
+        orders.forEach((order) => {
+          if (order.strategy) strategyNames.add(order.strategy);
+        });
+        const options = ["all", ...Array.from(strategyNames).sort()];
+        if (!options.includes(state.currentOrderStrategyFilter)) {
+          state.currentOrderStrategyFilter = "all";
+        }
+        select.innerHTML = options.map((name) => {
+          const label = name === "all" ? "全部策略" : name;
+          const selected = name === state.currentOrderStrategyFilter ? " selected" : "";
+          return `<option value="${esc(name)}"${selected}>${esc(label)}</option>`;
+        }).join("");
+      }
+
+      function orderFilterLabel(filter) {
+        return {
+          open: "当前挂单",
+          all: "全部订单",
+          filled: "已成交",
+          terminal: "已撤 / 终态",
+          unknown: "异常",
+        }[filter] || "当前挂单";
+      }
+
+      function filterOrders(orders, filter, strategyFilter) {
+        const byStrategy = strategyFilter === "all" ? orders : orders.filter((order) => order.strategy === strategyFilter);
+        if (filter === "all") return byStrategy;
+        if (filter === "open") return byStrategy.filter((order) => OPEN_ORDER_STATUSES.has(order.status));
+        if (filter === "filled") {
+          return byStrategy.filter((order) => order.status === "filled" || Number(order.filled_size || 0) > 0);
+        }
+        if (filter === "terminal") return byStrategy.filter((order) => TERMINAL_ORDER_STATUSES.has(order.status));
+        if (filter === "unknown") return byStrategy.filter((order) => order.status === "unknown");
+        return byStrategy;
+      }
+
+      function renderInventory() {
+        const balances = state.inventory?.balances || [];
+        const pnl = state.inventory?.pnl || {};
+        $("inventoryRows").innerHTML = balances.map((item) => `
+          <tr><th>${esc(item.currency)}</th><td>available ${esc(item.available)} / frozen ${esc(item.frozen)}</td></tr>
+        `).join("") + Object.entries(pnl).map(([symbol, item]) => `
+          <tr><th>${esc(symbol)} PnL</th><td>realized ${esc(item.realized_pnl)} / unrealized ${esc(item.unrealized_pnl)} / total ${esc(item.total_pnl)}</td></tr>
+        `).join("");
+        $("fillSummary").textContent = `${state.fills?.summary?.total || 0} fills · ${state.fills?.summary?.quote_volume || 0} USDT`;
+        $("fillRows").innerHTML = (state.fills?.fills || []).slice(-80).reverse().map((fill) => `
+          <tr>
+            <td>${esc(fill.trade_id)}</td>
+            <td>${esc(fill.symbol)}</td>
+            <td>${esc(fill.side)}</td>
+            <td>${esc(fill.price)}</td>
+            <td>${esc(fill.size)}</td>
+            <td>${esc(fill.strategy)}</td>
+          </tr>
+        `).join("");
+      }
+
+      function renderRisk() {
+        const risk = state.risk?.risk || {};
+        const stateRow = state.risk?.state || {};
+        $("riskStateBadge").textContent = stateRow.safe_mode ? "SAFE_MODE" : "normal";
+        $("riskStateBadge").className = stateRow.safe_mode ? "badge bad" : "badge ok";
+        $("liveReadyBadge").textContent = state.risk?.live_ready ? "ready" : "locked";
+        $("liveReadyBadge").className = state.risk?.live_ready ? "badge ok" : "badge warn";
+        $("riskRows").innerHTML = Object.entries(risk).map(([key, value]) => `
+          <tr><th>${esc(key)}</th><td>${typeof value === "object" ? esc(JSON.stringify(value)) : esc(value)}</td></tr>
+        `).join("") + `<tr><th>safe_mode</th><td>${esc(stateRow.safe_mode)} ${stateRow.reason ? "· " + esc(stateRow.reason) : ""}</td></tr>`;
+        $("securityRows").innerHTML = (state.risk?.checks || []).map((item) => `
+          <tr><th>${esc(item.name)}</th><td><span class="${item.passed ? "badge ok" : "badge warn"}">${esc(item.message)}</span></td></tr>
+        `).join("");
+      }
+
+      function renderSecurityAudit() {
+        if (!$("adminAuditRows")) return;
+        const audit = state.securityAudit || {};
+        $("adminAuditBadge").textContent = audit.valid_chain ? `signed · ${audit.total || 0}` : "locked";
+        $("adminAuditBadge").className = audit.valid_chain ? "badge ok" : "badge warn";
+        const rows = audit.events || [];
+        $("adminAuditRows").innerHTML = rows.slice(-40).reverse().map((item) => `
+          <tr>
+            <td>${esc(new Date(Number(item.ts || 0)).toLocaleString())}</td>
+            <td>${esc(item.role)}:${esc(item.user)}</td>
+            <td>${esc(item.path)}</td>
+            <td><span class="${item.success ? "badge ok" : "badge bad"}">${esc(item.status)}</span></td>
+            <td>${esc(String(item.signature || "").slice(0, 16))}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="5">${esc(audit.error || "暂无审计事件")}</td></tr>`;
+      }
+
+      function drawChart() {
+        const canvas = $("priceChart");
+        const box = canvas.parentElement.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = Math.max(320, Math.floor(box.width * ratio));
+        canvas.height = Math.max(220, Math.floor(box.height * ratio));
+        const ctx = canvas.getContext("2d");
+        ctx.scale(ratio, ratio);
+        const width = canvas.width / ratio;
+        const height = canvas.height / ratio;
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "#fbfdfd";
+        ctx.fillRect(0, 0, width, height);
+        const points = state.market?.points || [];
+        const pad = 34;
+        ctx.strokeStyle = "#d7e1e4";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad, pad);
+        ctx.lineTo(pad, height - pad);
+        ctx.lineTo(width - pad, height - pad);
+        ctx.stroke();
+        if (points.length < 2) {
+          ctx.fillStyle = "#607078";
+          ctx.font = "13px system-ui";
+          ctx.fillText("No market data", pad + 8, height / 2);
+          return;
+        }
+        const prices = points.map((point) => point.price);
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const range = max - min || 1;
+        ctx.strokeStyle = "#1769aa";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((point, idx) => {
+          const x = pad + (idx / (points.length - 1)) * (width - pad * 2);
+          const y = height - pad - ((point.price - min) / range) * (height - pad * 2);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.fillStyle = "#142126";
+        ctx.font = "12px system-ui";
+        ctx.fillText(String(max.toFixed(2)), pad + 4, pad + 12);
+        ctx.fillText(String(min.toFixed(2)), pad + 4, height - pad - 8);
+      }
+
+      function exchangeFormPayload() {
+        return {
+          exchange: $("exchangeInput").value,
+          account_name: $("accountNameInput").value,
+          mode: $("accountModeInput").value,
+          rest_endpoint: $("restEndpointInput").value,
+          public_ws_endpoint: $("publicWsInput").value,
+          private_ws_endpoint: $("privateWsInput").value,
+          api_key: $("apiKeyInput").value,
+          api_secret: $("apiSecretInput").value,
+          memo: $("memoInput").value,
+          read_only: $("readOnlyInput").checked,
+          allow_order_submission: $("orderSubmitInput").checked,
+          no_withdraw_ack: $("noWithdrawInput").checked,
+          ip_whitelist_ack: $("ipWhitelistInput").checked,
+        };
+      }
+
+      async function saveExchange() {
+        const result = await apiPost("/api/exchanges", exchangeFormPayload());
+        state.exchanges = result.exchanges;
+        $("apiKeyInput").value = "";
+        $("apiSecretInput").value = "";
+        $("memoInput").value = "";
+        renderExchanges();
+        renderOverview();
+        setToast(`账号已保存：${result.account.account_name}`);
+      }
+
+      async function testExchange() {
+        const result = await apiPost("/api/exchanges/test", exchangeFormPayload());
+        $("exchangeStatus").textContent = `${result.message} · ${result.checks.map((item) => `${item.name}:${item.message}`).join(" / ")}`;
+      }
+
+      async function saveSymbol() {
+        const payload = {
+          symbol: $("symbolInput").value.trim().toUpperCase(),
+          base: $("baseInput").value.trim().toUpperCase(),
+          quote: $("quoteInput").value.trim().toUpperCase(),
+          price_increment: $("priceIncrementInput").value.trim(),
+          size_increment: $("sizeIncrementInput").value.trim(),
+          base_min_size: $("sizeIncrementInput").value.trim(),
+          min_notional: $("minNotionalInput").value.trim(),
+          initial_price: $("initialPriceInput").value.trim(),
+        };
+        await apiPost("/api/symbols", payload);
+        state.currentMarketSymbol = payload.symbol;
+        $("symbolSaveStatus").textContent = `已保存 ${payload.symbol}`;
+        await loadAll();
+      }
+
+      async function setMarketSymbol(symbol) {
+        state.currentMarketSymbol = symbol;
+        state.market = await apiGet(`/api/market/history?symbol=${encodeURIComponent(symbol)}&limit=180`);
+        renderOverview();
+        renderSymbols();
+        drawChart();
+        setToast(`已切换行情：${symbol}`);
+      }
+
+      function editSymbol(symbol) {
+        const item = (state.symbols?.symbols || []).find((entry) => entry.symbol === symbol);
+        if (!item) return;
+        state.currentMarketSymbol = symbol;
+        fillSymbolForm(item);
+        renderSymbols();
+        $("symbolSaveStatus").textContent = `正在编辑 ${symbol}`;
+      }
+
+      async function deleteSymbol(symbol) {
+        const item = (state.symbols?.symbols || []).find((entry) => entry.symbol === symbol);
+        const strategyText = item?.strategy_count ? `，并移除 ${item.strategy_count} 个绑定策略配置` : "";
+        const ok = window.confirm(`确认删除交易对 ${symbol}${strategyText}？`);
+        if (!ok) return;
+        const confirmation = confirmPhrase(`DELETE SYMBOL ${symbol}`, `确认删除交易对 ${symbol}${strategyText}？`);
+        const result = await apiPost("/api/symbols/delete", { symbol, force: true, confirmation });
+        state.currentMarketSymbol = result.config.symbols?.[0] || null;
+        $("symbolSaveStatus").textContent = `已删除 ${symbol}，移除策略 ${result.removed_strategies.length} 个`;
+        await loadAll();
+      }
+
+      function createStrategyForSymbol(symbol) {
+        document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
+        document.querySelectorAll(".page").forEach((item) => item.classList.remove("active"));
+        document.querySelector('button[data-page="strategies"]').classList.add("active");
+        $("page-strategies").classList.add("active");
+        $("strategyInstanceInput").value = "";
+        $("strategySymbolInput").value = symbol;
+        $("strategySaveStatus").textContent = `正在为 ${symbol} 创建策略`;
+      }
+
+      async function saveStrategy() {
+        const name = $("strategyTemplateInput").value;
+        const params = collectStrategyParams(name);
+        const id = $("strategyInstanceInput").value.trim() || (name === "range_rebalance" ? defaultStrategyInstanceId(name, $("strategySymbolInput").value, params) : "");
+        const payload = {
+          name,
+          symbol: $("strategySymbolInput").value,
+          enabled: $("strategyEnabledInput").value === "true",
+          params,
+        };
+        if (id) payload.id = id;
+        await apiPost("/api/strategies", payload);
+        $("strategyInstanceInput").value = id;
+        $("strategySaveStatus").textContent = `已保存 ${id || payload.name + ":" + payload.symbol}`;
+        await loadAll();
+      }
+
+      async function updateStrategyState(action, key, name, symbol) {
+        const payload = { action, key, name, symbol };
+        if (action === "start") {
+          const target = key || `${name}:${symbol}`;
+          payload.confirmation = confirmPhrase(`START STRATEGY ${target}`, `确认启动策略 ${target}？`);
+        }
+        const result = await apiPost("/api/strategies/state", payload);
+        state.strategies = result.strategies;
+        renderStrategies();
+        setToast(`${key || name + ":" + symbol} ${result.status}`);
+      }
+
+      async function deleteStrategy(key, name, symbol, openOrders) {
+        if (Number(openOrders || 0) > 0) {
+          setToast(`${key} 还有 ${openOrders} 个当前挂单，先到订单中心生成撤单计划`);
+          return;
+        }
+        const ok = window.confirm(`确认删除策略实例 ${key || name + ":" + symbol}？`);
+        if (!ok) return;
+        const target = key || `${name}:${symbol}`;
+        const confirmation = confirmPhrase(`DELETE STRATEGY ${target}`, `确认删除策略实例 ${target}？`);
+        const result = await apiPost("/api/strategies/delete", { key, name, symbol, confirmation });
+        state.strategies = result.strategies;
+        state.config = result.config;
+        state.audit = result.audit;
+        $("strategySaveStatus").textContent = `已删除 ${result.key}`;
+        await loadAll();
+      }
+
+      async function refreshOrders(source = state.currentOrderSource) {
+        state.currentOrderSource = source;
+        document.querySelectorAll(".order-tab").forEach((btn) => btn.classList.toggle("blue", btn.dataset.source === source));
+        const payload = source === "remote" ? await apiGet("/api/orders/remote") : source === "reconcile" ? await apiGet("/api/orders/reconcile") : await apiGet("/api/orders");
+        if (source === "local") state.orders = payload;
+        renderOrders(payload);
+      }
+
+      function setOrderStatusFilter(filter) {
+        state.currentOrderStatusFilter = filter;
+        refreshOrders().catch((err) => $("orderActionStatus").textContent = err.message);
+      }
+
+      function setOrderStrategyFilter(strategy) {
+        state.currentOrderStrategyFilter = strategy;
+        refreshOrders().catch((err) => $("orderActionStatus").textContent = err.message);
+      }
+
+      async function buildCancelPlan() {
+        const plan = await apiPost("/api/orders/cancel-plan", {});
+        $("orderActionStatus").textContent = `撤单计划 ${plan.requests.length} 条；dry-run 未发送交易所`;
+      }
+
+      async function toggleKillSwitch(enabled) {
+        const confirmation = confirmPhrase(enabled ? "PAUSE NEW ORDERS" : "RESUME NEW ORDERS", enabled ? "确认暂停新单？" : "确认恢复新单？");
+        const result = await apiPost("/api/risk/kill-switch", { enabled, reason: enabled ? "manual pause from admin console" : "manual resume from admin console", confirmation });
+        state.risk = result.risk;
+        renderTop();
+        renderRisk();
+      }
+
+      document.querySelectorAll(".nav-link").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".nav-link").forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".page").forEach((item) => item.classList.remove("active"));
+          btn.classList.add("active");
+          $(`page-${btn.dataset.page}`).classList.add("active");
+          if (btn.dataset.page === "overview") drawChart();
+        });
+      });
+
+      $("reloadBtn").addEventListener("click", () => loadAll().catch((err) => setToast(err.message)));
+      $("saveExchangeBtn").addEventListener("click", () => saveExchange().catch((err) => $("exchangeStatus").textContent = err.message));
+      $("testExchangeBtn").addEventListener("click", () => testExchange().catch((err) => $("exchangeStatus").textContent = err.message));
+      $("saveSymbolBtn").addEventListener("click", () => saveSymbol().catch((err) => $("symbolSaveStatus").textContent = err.message));
+      $("newSymbolBtn").addEventListener("click", clearSymbolForm);
+      $("refreshMarketBtn").addEventListener("click", () => loadAll().catch((err) => setToast(err.message)));
+      $("marketSymbolSelect").addEventListener("change", () => setMarketSymbol($("marketSymbolSelect").value).catch((err) => setToast(err.message)));
+      $("strategyTemplateInput").addEventListener("change", () => {
+        $("strategyInstanceInput").value = "";
+        renderStrategyFields($("strategyTemplateInput").value, {});
+      });
+      $("strategySymbolInput").addEventListener("change", () => {
+        $("strategyInstanceInput").value = "";
+      });
+      $("saveStrategyBtn").addEventListener("click", () => saveStrategy().catch((err) => $("strategySaveStatus").textContent = err.message));
+      $("refreshOrdersBtn").addEventListener("click", () => refreshOrders().catch((err) => $("orderActionStatus").textContent = err.message));
+      $("cancelPlanBtn").addEventListener("click", () => buildCancelPlan().catch((err) => $("orderActionStatus").textContent = err.message));
+      $("killSwitchBtn").addEventListener("click", () => toggleKillSwitch(true).catch((err) => setToast(err.message)));
+      $("riskKillBtn").addEventListener("click", () => toggleKillSwitch(true).catch((err) => setToast(err.message)));
+      $("adminLoginBtn").addEventListener("click", () => loginAdmin().catch((err) => $("loginStatus").textContent = err.message));
+      $("adminTokenInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") loginAdmin().catch((err) => $("loginStatus").textContent = err.message);
+      });
+      $("logoutBtn").addEventListener("click", logoutAdmin);
+      document.querySelectorAll(".order-tab").forEach((btn) => btn.addEventListener("click", () => refreshOrders(btn.dataset.source).catch((err) => $("orderActionStatus").textContent = err.message)));
+      document.querySelectorAll(".order-status-filter").forEach((btn) => btn.addEventListener("click", () => setOrderStatusFilter(btn.dataset.filter)));
+      $("orderStrategyFilter").addEventListener("change", () => setOrderStrategyFilter($("orderStrategyFilter").value));
+      $("symbolRows").addEventListener("click", (event) => {
+        const btn = event.target.closest(".symbol-action");
+        if (!btn) return;
+        if (btn.dataset.action === "view") setMarketSymbol(btn.dataset.symbol).catch((err) => setToast(err.message));
+        if (btn.dataset.action === "edit") editSymbol(btn.dataset.symbol);
+        if (btn.dataset.action === "strategy") createStrategyForSymbol(btn.dataset.symbol);
+        if (btn.dataset.action === "delete") deleteSymbol(btn.dataset.symbol).catch((err) => $("symbolSaveStatus").textContent = err.message);
+      });
+      $("strategyRows").addEventListener("click", (event) => {
+        const btn = event.target.closest(".strategy-action");
+        if (!btn) return;
+        if (btn.dataset.action === "detail") {
+          showStrategyDetail(btn.dataset.key).catch((err) => setToast(err.message));
+          return;
+        }
+        if (btn.dataset.action === "stop_cancel") {
+          stopCancelStrategy(btn.dataset.key, btn.dataset.name, btn.dataset.symbol).catch((err) => setToast(err.message));
+          return;
+        }
+        if (btn.dataset.action === "delete") {
+          deleteStrategy(btn.dataset.key, btn.dataset.name, btn.dataset.symbol, btn.dataset.openOrders).catch((err) => setToast(err.message));
+          return;
+        }
+        updateStrategyState(btn.dataset.action, btn.dataset.key, btn.dataset.name, btn.dataset.symbol).catch((err) => setToast(err.message));
+      });
+      window.addEventListener("resize", drawChart);
+
+      async function bootstrap() {
+        await requireAuth();
+        await loadReport().catch((err) => {
+          $("statusPill").textContent = "ERROR";
+          setToast(err.message);
+        });
+        await loadAll();
+      }
+
+      bootstrap().catch((err) => {
+        if (err.message !== "admin authentication required") setToast(err.message);
+      });
+    </script>
+  </body>
+</html>

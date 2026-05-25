@@ -1,0 +1,8 @@
+services:
+  market-maker-paper:
+    build: .
+    environment:
+      - PYTHONPATH=/app/src
+    volumes:
+      - ./runtime:/app/runtime
+    command: ["python", "-m", "mm.main", "--config", "config/paper.json"]
